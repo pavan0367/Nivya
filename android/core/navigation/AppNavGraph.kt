@@ -29,7 +29,9 @@ import com.nivya.ui.device_health.ParentDeviceHealthViewModel
 import com.nivya.ui.location.ChildLocationScreen
 import com.nivya.ui.location.ParentLocationScreen
 import com.nivya.ui.network.ChildNetworkScreen
+import com.nivya.ui.network.ChildNetworkViewModel
 import com.nivya.ui.network.ParentNetworkScreen
+import com.nivya.ui.network.ParentNetworkViewModel
 import com.nivya.ui.pairing.PairingScreen
 import com.nivya.ui.pairing.PairingViewModel
 import com.nivya.ui.role.RoleSelectionScreen
@@ -263,7 +265,10 @@ fun AppNavGraph(
                     ParentDeviceHealthScreen(viewModel = healthViewModel)
                 }
                 composable(route = NavigationDestination.ParentNetwork.route) {
-                    ParentNetworkScreen()
+                    val networkViewModel: ParentNetworkViewModel = viewModel(
+                        factory = ParentNetworkViewModel.provideFactory(appContainer.networkRepository)
+                    )
+                    ParentNetworkScreen(viewModel = networkViewModel)
                 }
                 composable(route = NavigationDestination.ParentAlerts.route) {
                     ParentAlertsScreen()
@@ -296,7 +301,10 @@ fun AppNavGraph(
                     ChildScreenTimeScreen()
                 }
                 composable(route = NavigationDestination.ChildNetwork.route) {
-                    ChildNetworkScreen()
+                    val networkViewModel: ChildNetworkViewModel = viewModel(
+                        factory = ChildNetworkViewModel.provideFactory(appContainer.networkRepository)
+                    )
+                    ChildNetworkScreen(viewModel = networkViewModel)
                 }
                 composable(route = NavigationDestination.ChildLocation.route) {
                     ChildLocationScreen()

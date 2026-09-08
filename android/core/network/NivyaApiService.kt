@@ -83,4 +83,20 @@ interface NivyaApiService {
     suspend fun getBatteryTrends(
         @retrofit2.http.Path("deviceId") deviceId: Long
     ): Response<ApiResponseDto<BatteryTrendResponseDto>>
+
+    // --- Network Telemetry ---
+    @POST("api/v1/network/telemetry")
+    suspend fun sendNetworkTelemetry(
+        @Body request: NetworkTelemetryRequestDto
+    ): Response<ApiResponseDto<NetworkStatusResponseDto>>
+
+    @GET("api/v1/network/current/{deviceId}")
+    suspend fun getCurrentNetwork(
+        @retrofit2.http.Path("deviceId") deviceId: Long
+    ): Response<ApiResponseDto<NetworkStatusResponseDto>>
+
+    @GET("api/v1/network/history/{deviceId}")
+    suspend fun getNetworkHistory(
+        @retrofit2.http.Path("deviceId") deviceId: Long
+    ): Response<ApiResponseDto<NetworkHistoryResponseDto>>
 }
