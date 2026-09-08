@@ -59,7 +59,31 @@ public class GlobalExceptionHandler {
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.UNAUTHORIZED.value(),
                 HttpStatus.UNAUTHORIZED.getReasonPhrase(),
-                "Invalid credentials provided",
+                ex.getMessage() != null && !ex.getMessage().isBlank() ? ex.getMessage() : "Invalid credentials provided",
+                request.getRequestURI()
+        );
+        return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(com.nivya.auth.exception.DuplicateEmailException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateEmail(com.nivya.auth.exception.DuplicateEmailException ex, HttpServletRequest request) {
+        log.warn("Duplicate email registration attempt on {}: {}", request.getRequestURI(), ex.getMessage());
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                "Email Conflict",
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(com.nivya.auth.exception.InvalidTokenException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidToken(com.nivya.auth.exception.InvalidTokenException ex, HttpServletRequest request) {
+        log.warn("Invalid token attempt on {}: {}", request.getRequestURI(), ex.getMessage());
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.UNAUTHORIZED.value(),
+                HttpStatus.UNAUTHORIZED.getReasonPhrase(),
+                ex.getMessage(),
                 request.getRequestURI()
         );
         return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);

@@ -1,8 +1,13 @@
 package com.nivya.security.config;
 
+import com.nivya.security.jwt.CustomAccessDeniedHandler;
+import com.nivya.security.jwt.JwtAuthenticationEntryPoint;
+import com.nivya.security.jwt.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -11,6 +16,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -19,8 +25,8 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Spring Security Foundation Configuration.
- * Configures stateless JWT-ready filters, CORS, and endpoint authorization rules.
+ * Spring Security Configuration.
+ * Configures stateless JWT authentication filters, CORS, exception handling, and role-based endpoint authorization.
  */
 @Configuration
 @EnableWebSecurity
@@ -30,9 +36,27 @@ public class SecurityConfig {
     @Value("${nivya.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173}")
     private String allowedOrigins;
 
+    private final JwtAuthenticationEntryPoint authenticationEntryPoint;
+    private final CustomAccessDeniedHandler accessDeniedHandler;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    public SecurityConfig(
+            JwtAuthenticationEntryPoint authenticationEntryPoint,
+            CustomAccessDeniedHandler accessDeniedHandler,
+            JwtAuthenticationFilter jwtAuthenticationFilter) {
+        this.authenticationEntryPoint = authenticationEntryPoint;
+        this.accessDeniedHandler = accessDeniedHandler;
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    }
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+        return authenticationConfiguration.getAuthenticationManager();
     }
 
     @Bean
@@ -40,12 +64,20 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
+                )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // Public liveness & readiness endpoints
                         .requestMatchers("/api/v1/health", "/api/v1/ping").permitAll()
-                        // Public Auth endpoints (login, register, token refresh)
-                        .requestMatchers("/api/v1/auth/**").permitAll()
+                        // Public Auth endpoints (registration, login, refresh)
+                        .requestMatchers(
+                                "/api/v1/auth/register",
+                                "/api/v1/auth/login",
+                                "/api/v1/auth/refresh"
+                        ).permitAll()
                         // Actuator monitoring endpoints
                         .requestMatchers("/actuator/**").permitAll()
                         // OpenAPI / Swagger UI endpoints
@@ -57,9 +89,14 @@ public class SecurityConfig {
                         ).permitAll()
                         // WebSocket Handshake endpoints
                         .requestMatchers("/ws/**").permitAll()
-                        // All other APIs require authentication (to be wired in Phase 4)
+                        // Role-specific protected endpoints
+                        .requestMatchers("/api/v1/parent/**").hasRole("PARENT")
+                        .requestMatchers("/api/v1/child/**").hasRole("CHILD")
+                        // All other APIs require authentication
                         .anyRequest().authenticated()
                 );
+
+        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
