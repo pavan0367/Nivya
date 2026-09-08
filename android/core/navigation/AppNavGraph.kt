@@ -38,7 +38,9 @@ import com.nivya.ui.role.RoleSelectionScreen
 import com.nivya.ui.role.RoleSelectionViewModel
 import com.nivya.ui.role.RoleType
 import com.nivya.ui.screen_time.ChildScreenTimeScreen
+import com.nivya.ui.screen_time.ChildScreenTimeViewModel
 import com.nivya.ui.screen_time.ParentAppUsageScreen
+import com.nivya.ui.screen_time.ParentAppUsageViewModel
 import com.nivya.ui.settings.ChildSettingsScreen
 import com.nivya.ui.settings.ParentSettingsScreen
 import kotlinx.coroutines.launch
@@ -250,8 +252,12 @@ fun AppNavGraph(
                     ParentHistoryScreen()
                 }
                 composable(route = NavigationDestination.ParentAppUsage.route) {
-                    ParentAppUsageScreen()
+                    val usageViewModel: ParentAppUsageViewModel = viewModel(
+                        factory = ParentAppUsageViewModel.provideFactory(appContainer.usageRepository)
+                    )
+                    ParentAppUsageScreen(viewModel = usageViewModel)
                 }
+
                 composable(route = NavigationDestination.ParentCommunication.route) {
                     ParentCommunicationScreen()
                 }
@@ -298,8 +304,13 @@ fun AppNavGraph(
                     ChildBatteryScreen(viewModel = batteryViewModel)
                 }
                 composable(route = NavigationDestination.ChildScreenTime.route) {
-                    ChildScreenTimeScreen()
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    val screenTimeViewModel: ChildScreenTimeViewModel = viewModel(
+                        factory = ChildScreenTimeViewModel.provideFactory(context, appContainer.usageRepository)
+                    )
+                    ChildScreenTimeScreen(viewModel = screenTimeViewModel)
                 }
+
                 composable(route = NavigationDestination.ChildNetwork.route) {
                     val networkViewModel: ChildNetworkViewModel = viewModel(
                         factory = ChildNetworkViewModel.provideFactory(appContainer.networkRepository)

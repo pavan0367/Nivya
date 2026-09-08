@@ -99,4 +99,28 @@ interface NivyaApiService {
     suspend fun getNetworkHistory(
         @retrofit2.http.Path("deviceId") deviceId: Long
     ): Response<ApiResponseDto<NetworkHistoryResponseDto>>
+
+    // --- Screen Time & App Usage ---
+    @POST("api/v1/usage/telemetry")
+    suspend fun sendUsageTelemetry(
+        @Body request: UsageTelemetryRequestDto
+    ): Response<ApiResponseDto<UsageSummaryResponseDto>>
+
+    @GET("api/v1/usage/summary/{deviceId}")
+    suspend fun getDailyUsageSummary(
+        @retrofit2.http.Path("deviceId") deviceId: Long,
+        @retrofit2.http.Query("date") date: String? = null
+    ): Response<ApiResponseDto<UsageSummaryResponseDto>>
+
+    @GET("api/v1/usage/apps/{deviceId}")
+    suspend fun getAppUsage(
+        @retrofit2.http.Path("deviceId") deviceId: Long,
+        @retrofit2.http.Query("date") date: String? = null
+    ): Response<ApiResponseDto<AppUsageResponseDto>>
+
+    @GET("api/v1/usage/trends/{deviceId}")
+    suspend fun getUsageTrends(
+        @retrofit2.http.Path("deviceId") deviceId: Long
+    ): Response<ApiResponseDto<UsageTrendResponseDto>>
 }
+

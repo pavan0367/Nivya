@@ -13,6 +13,7 @@ import com.nivya.data.repository.BatteryRepository
 import com.nivya.data.repository.NetworkRepository
 import com.nivya.data.repository.PairingRepository
 import com.nivya.data.repository.RoleRepository
+import com.nivya.data.repository.UsageRepository
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -33,7 +34,9 @@ interface AppContainer {
     val pairingRepository: PairingRepository
     val batteryRepository: BatteryRepository
     val networkRepository: NetworkRepository
+    val usageRepository: UsageRepository
 }
+
 
 class DefaultAppContainer(private val context: Context) : AppContainer {
 
@@ -106,4 +109,9 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
     override val networkRepository: NetworkRepository by lazy {
         NetworkRepository(context, apiService, tokenStorage, database, networkMonitor)
     }
+
+    override val usageRepository: UsageRepository by lazy {
+        UsageRepository(context, apiService, tokenStorage, database, networkMonitor)
+    }
 }
+

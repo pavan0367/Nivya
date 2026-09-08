@@ -6,6 +6,7 @@ import com.nivya.core.di.AppContainer
 import com.nivya.core.di.DefaultAppContainer
 import com.nivya.services.sync.BatterySyncWorker
 import com.nivya.services.sync.NetworkSyncWorker
+import com.nivya.services.sync.UsageSyncWorker
 
 /**
  * Root Application class initializing the DI container and WorkManager configuration.
@@ -20,7 +21,9 @@ class NivyaApp : Application(), Configuration.Provider {
         container = DefaultAppContainer(this)
         BatterySyncWorker.schedulePeriodic(this)
         NetworkSyncWorker.schedulePeriodic(this)
+        UsageSyncWorker.schedulePeriodic(this)
     }
+
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
