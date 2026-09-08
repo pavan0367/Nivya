@@ -59,7 +59,7 @@ yarn-error.log*
 lerna-debug.log*
 
 # Database data mounts
-data/
+/data/
 docker/mysql/data/
 docker/redis/data/
 
