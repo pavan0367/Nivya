@@ -10,7 +10,9 @@ import com.nivya.core.security.SecureTokenStorage
 import com.nivya.data.local.UserPreferencesDataStore
 import com.nivya.data.repository.AuthRepository
 import com.nivya.data.repository.BatteryRepository
+import com.nivya.data.repository.LocationRepository
 import com.nivya.data.repository.NetworkRepository
+
 import com.nivya.data.repository.PairingRepository
 import com.nivya.data.repository.RoleRepository
 import com.nivya.data.repository.UsageRepository
@@ -35,7 +37,9 @@ interface AppContainer {
     val batteryRepository: BatteryRepository
     val networkRepository: NetworkRepository
     val usageRepository: UsageRepository
+    val locationRepository: LocationRepository
 }
+
 
 
 class DefaultAppContainer(private val context: Context) : AppContainer {
@@ -113,5 +117,10 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
     override val usageRepository: UsageRepository by lazy {
         UsageRepository(context, apiService, tokenStorage, database, networkMonitor)
     }
+
+    override val locationRepository: LocationRepository by lazy {
+        LocationRepository(context, apiService, tokenStorage, database, networkMonitor)
+    }
 }
+
 

@@ -85,17 +85,31 @@ class BatteryIntegrationTest {
     @Autowired
     private com.nivya.auth.repository.RefreshTokenRepository refreshTokenRepository;
 
+    @Autowired
+    private com.nivya.location.repository.LocationHistoryRepository locationHistoryRepository;
+
+    @Autowired
+    private com.nivya.location.repository.LocationStatusRepository locationStatusRepository;
+
+    @Autowired
+    private com.nivya.consent.repository.ConsentRepository consentRepository;
+
     @BeforeEach
     void setUp() throws Exception {
+        locationHistoryRepository.deleteAll();
+        locationStatusRepository.deleteAll();
         batteryHistoryRepository.deleteAll();
         batteryStatusRepository.deleteAll();
+
         alertRepository.deleteAll();
         deviceStatusRepository.deleteAll();
         deviceRepository.deleteAll();
+        consentRepository.deleteAll();
         familyMemberRepository.deleteAll();
         familyRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
+
 
         // 1. Register Parent
         RegisterRequest parentReq = new RegisterRequest("Parent User", "parent.bat@nivya.local", "Password123!", RoleType.PARENT);

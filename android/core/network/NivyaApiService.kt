@@ -122,5 +122,24 @@ interface NivyaApiService {
     suspend fun getUsageTrends(
         @retrofit2.http.Path("deviceId") deviceId: Long
     ): Response<ApiResponseDto<UsageTrendResponseDto>>
+
+    // --- Location Telemetry ---
+    @POST("api/v1/location/telemetry")
+    suspend fun sendLocationTelemetry(
+        @Body request: LocationTelemetryRequestDto
+    ): Response<ApiResponseDto<LocationStatusResponseDto>>
+
+    @GET("api/v1/location/current/{deviceId}")
+    suspend fun getCurrentLocation(
+        @retrofit2.http.Path("deviceId") deviceId: Long
+    ): Response<ApiResponseDto<LocationStatusResponseDto>>
+
+    @GET("api/v1/location/history/{deviceId}")
+    suspend fun getLocationHistory(
+        @retrofit2.http.Path("deviceId") deviceId: Long,
+        @retrofit2.http.Query("startTime") startTime: String? = null,
+        @retrofit2.http.Query("endTime") endTime: String? = null
+    ): Response<ApiResponseDto<LocationHistoryResponseDto>>
 }
+
 

@@ -27,7 +27,10 @@ import com.nivya.ui.device_health.ChildDeviceHealthScreen
 import com.nivya.ui.device_health.ParentDeviceHealthScreen
 import com.nivya.ui.device_health.ParentDeviceHealthViewModel
 import com.nivya.ui.location.ChildLocationScreen
+import com.nivya.ui.location.ChildLocationViewModel
 import com.nivya.ui.location.ParentLocationScreen
+import com.nivya.ui.location.ParentLocationViewModel
+
 import com.nivya.ui.network.ChildNetworkScreen
 import com.nivya.ui.network.ChildNetworkViewModel
 import com.nivya.ui.network.ParentNetworkScreen
@@ -262,8 +265,12 @@ fun AppNavGraph(
                     ParentCommunicationScreen()
                 }
                 composable(route = NavigationDestination.ParentLocation.route) {
-                    ParentLocationScreen()
+                    val locationViewModel: ParentLocationViewModel = viewModel(
+                        factory = ParentLocationViewModel.provideFactory(appContainer.locationRepository)
+                    )
+                    ParentLocationScreen(viewModel = locationViewModel)
                 }
+
                 composable(route = NavigationDestination.ParentDeviceHealth.route) {
                     val healthViewModel: ParentDeviceHealthViewModel = viewModel(
                         factory = ParentDeviceHealthViewModel.provideFactory(appContainer.batteryRepository)
@@ -318,8 +325,13 @@ fun AppNavGraph(
                     ChildNetworkScreen(viewModel = networkViewModel)
                 }
                 composable(route = NavigationDestination.ChildLocation.route) {
-                    ChildLocationScreen()
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    val locationViewModel: ChildLocationViewModel = viewModel(
+                        factory = ChildLocationViewModel.provideFactory(context, appContainer.locationRepository)
+                    )
+                    ChildLocationScreen(viewModel = locationViewModel)
                 }
+
                 composable(route = NavigationDestination.ChildDeviceHealth.route) {
                     ChildDeviceHealthScreen()
                 }

@@ -7,20 +7,29 @@ import androidx.room.RoomDatabase
 import com.nivya.core.database.dao.BatteryDao
 import com.nivya.core.database.dao.DeviceStatusDao
 import com.nivya.core.database.dao.FamilyDao
+import com.nivya.core.database.dao.LocationDao
 import com.nivya.core.database.dao.NetworkDao
 import com.nivya.core.database.dao.UsageDao
 import com.nivya.core.database.entities.BatteryEntity
 import com.nivya.core.database.entities.DeviceStatusEntity
 import com.nivya.core.database.entities.FamilyEntity
+import com.nivya.core.database.entities.LocationEntity
 import com.nivya.core.database.entities.NetworkEntity
 import com.nivya.core.database.entities.UsageEntity
 
 /**
- * Room Database caching family links, device telemetry, battery offline queue, network queue, and usage stats.
+ * Room Database caching family links, device telemetry, battery offline queue, network queue, usage stats, and location.
  */
 @Database(
-    entities = [FamilyEntity::class, DeviceStatusEntity::class, BatteryEntity::class, NetworkEntity::class, UsageEntity::class],
-    version = 4,
+    entities = [
+        FamilyEntity::class,
+        DeviceStatusEntity::class,
+        BatteryEntity::class,
+        NetworkEntity::class,
+        UsageEntity::class,
+        LocationEntity::class
+    ],
+    version = 5,
     exportSchema = false
 )
 abstract class NivyaDatabase : RoomDatabase() {
@@ -30,6 +39,8 @@ abstract class NivyaDatabase : RoomDatabase() {
     abstract fun batteryDao(): BatteryDao
     abstract fun networkDao(): NetworkDao
     abstract fun usageDao(): UsageDao
+    abstract fun locationDao(): LocationDao
+
 
     companion object {
         @Volatile

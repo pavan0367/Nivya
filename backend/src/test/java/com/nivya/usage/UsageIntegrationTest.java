@@ -89,6 +89,15 @@ class UsageIntegrationTest {
     @Autowired
     private com.nivya.auth.repository.RefreshTokenRepository refreshTokenRepository;
 
+    @Autowired
+    private com.nivya.location.repository.LocationHistoryRepository locationHistoryRepository;
+
+    @Autowired
+    private com.nivya.location.repository.LocationStatusRepository locationStatusRepository;
+
+    @Autowired
+    private com.nivya.consent.repository.ConsentRepository consentRepository;
+
     private User parentUser;
     private User childUser;
     private Family family;
@@ -98,8 +107,11 @@ class UsageIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        locationHistoryRepository.deleteAll();
+        locationStatusRepository.deleteAll();
         usageAppRepository.deleteAll();
         usageSummaryRepository.deleteAll();
+
         networkHistoryRepository.deleteAll();
         networkStatusRepository.deleteAll();
         batteryHistoryRepository.deleteAll();
@@ -107,10 +119,12 @@ class UsageIntegrationTest {
         alertRepository.deleteAll();
         deviceStatusRepository.deleteAll();
         deviceRepository.deleteAll();
+        consentRepository.deleteAll();
         familyMemberRepository.deleteAll();
         familyRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
+
 
         // 1. Register Parent
         RegisterRequest parentReq = new RegisterRequest("Sarah Parent", "sarah.usage@nivya.local", "SecurePass123!", RoleType.PARENT);

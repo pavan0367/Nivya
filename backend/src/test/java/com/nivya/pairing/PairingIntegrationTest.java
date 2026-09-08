@@ -83,10 +83,19 @@ class PairingIntegrationTest {
     @Autowired
     private PairingRateLimiter rateLimiter;
 
+    @Autowired
+    private com.nivya.location.repository.LocationHistoryRepository locationHistoryRepository;
+
+    @Autowired
+    private com.nivya.location.repository.LocationStatusRepository locationStatusRepository;
+
     @BeforeEach
     void setUp() {
         rateLimiter.clearAll();
+        locationHistoryRepository.deleteAll();
+        locationStatusRepository.deleteAll();
         auditLogRepository.deleteAll();
+
         consentRepository.deleteAll();
         pairingRequestRepository.deleteAll();
         deviceStatusRepository.deleteAll();
