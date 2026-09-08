@@ -101,6 +101,30 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
     }
 
+    @ExceptionHandler(com.nivya.pairing.exception.PairingException.class)
+    public ResponseEntity<ErrorResponse> handlePairingException(com.nivya.pairing.exception.PairingException ex, HttpServletRequest request) {
+        log.warn("Pairing error on {}: {}", request.getRequestURI(), ex.getMessage());
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                "Pairing Error",
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(com.nivya.pairing.exception.RateLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleRateLimitExceeded(com.nivya.pairing.exception.RateLimitExceededException ex, HttpServletRequest request) {
+        log.warn("Rate limit exceeded on {}: {}", request.getRequestURI(), ex.getMessage());
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.TOO_MANY_REQUESTS.value(),
+                "Rate Limit Exceeded",
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return new ResponseEntity<>(error, HttpStatus.TOO_MANY_REQUESTS);
+    }
+
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
     public ResponseEntity<ErrorResponse> handleIllegalArguments(RuntimeException ex, HttpServletRequest request) {
         log.warn("Illegal argument/state on {}: {}", request.getRequestURI(), ex.getMessage());

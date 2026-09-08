@@ -44,10 +44,21 @@ class AuthIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
     @BeforeEach
     void setUp() {
-        refreshTokenRepository.deleteAll();
-        userRepository.deleteAll();
+        jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE;");
+        jdbcTemplate.execute("TRUNCATE TABLE consents;");
+        jdbcTemplate.execute("TRUNCATE TABLE pairing_requests;");
+        jdbcTemplate.execute("TRUNCATE TABLE device_status;");
+        jdbcTemplate.execute("TRUNCATE TABLE devices;");
+        jdbcTemplate.execute("TRUNCATE TABLE family_members;");
+        jdbcTemplate.execute("TRUNCATE TABLE families;");
+        jdbcTemplate.execute("TRUNCATE TABLE refresh_tokens;");
+        jdbcTemplate.execute("TRUNCATE TABLE users;");
+        jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE;");
     }
 
     @Test
