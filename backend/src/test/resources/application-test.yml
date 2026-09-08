@@ -1,0 +1,33 @@
+# Nivya - Test Profile Configuration (In-Memory for CI & Local Verification)
+spring:
+  application:
+    name: nivya-backend-test
+  datasource:
+    url: jdbc:h2:mem:nivya_test_db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=MySQL
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+  flyway:
+    enabled: false
+  data:
+    redis:
+      repositories:
+        enabled: false
+
+nivya:
+  jwt:
+    secret: 4e6976796153656375726546616d696c795361666574794b6579323032363132
+    access-token-expiration-ms: 60000
+    refresh-token-expiration-ms: 120000
+  cors:
+    allowed-origins: http://localhost:3000
+
+logging:
+  level:
+    root: WARN
+    com.nivya: INFO

@@ -1,0 +1,23 @@
+# Nivya - Production Profile Configuration
+server:
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false
+
+spring:
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
+
+logging:
+  level:
+    root: WARN
+    com.nivya: INFO
+    org.springframework.security: WARN
+    org.hibernate: ERROR

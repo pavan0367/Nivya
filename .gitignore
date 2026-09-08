@@ -32,8 +32,8 @@ buildNumber.properties
 
 # Android / Gradle
 .gradle/
-build/
-**/build/
+/build/
+android/**/build/
 android/.gradle/
 android/build/
 android/app/build/
