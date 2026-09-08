@@ -1,0 +1,101 @@
+services:
+  # MySQL Database Service
+  mysql:
+    image: mysql:8.0
+    container_name: nivya-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-nivya_root_super_secret_dev_pass_2026}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-nivya_db}
+      MYSQL_USER: ${MYSQL_USER:-nivya_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-nivya_secure_dev_password_2026}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-nivya_root_super_secret_dev_pass_2026}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - nivya-network
+
+  # Redis In-Memory Cache & Pub/Sub
+  redis:
+    image: redis:7.2-alpine
+    container_name: nivya-redis
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD:-nivya_redis_secure_dev_password}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-nivya_redis_secure_dev_password}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - nivya-network
+
+  # Spring Boot Backend Service (Active in multi-container dev/prod deployments)
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    container_name: nivya-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      SERVER_PORT: 8080
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-nivya_db}
+      MYSQL_USER: ${MYSQL_USER:-nivya_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-nivya_secure_dev_password_2026}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-nivya_redis_secure_dev_password}
+      JWT_SECRET: ${JWT_SECRET:-4e6976796153656375726546616d696c795361666574794b6579323032363132}
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    networks:
+      - nivya-network
+    profiles:
+      - app # Run with --profile app when backend container is built
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: nivya-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+    networks:
+      - nivya-network
+    profiles:
+      - full # Run with --profile full when reverse proxy is desired
+
+networks:
+  nivya-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
