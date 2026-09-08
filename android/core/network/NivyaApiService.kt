@@ -62,4 +62,25 @@ interface NivyaApiService {
     suspend fun revokePairing(
         @Body request: RevokePairingRequestDto
     ): Response<ApiResponseDto<Unit>>
+
+    // --- Battery Telemetry ---
+    @POST("api/v1/battery/telemetry")
+    suspend fun sendBatteryTelemetry(
+        @Body request: BatteryTelemetryRequestDto
+    ): Response<ApiResponseDto<BatteryStatusResponseDto>>
+
+    @GET("api/v1/battery/current/{deviceId}")
+    suspend fun getCurrentBattery(
+        @retrofit2.http.Path("deviceId") deviceId: Long
+    ): Response<ApiResponseDto<BatteryStatusResponseDto>>
+
+    @GET("api/v1/battery/history/{deviceId}")
+    suspend fun getBatteryHistory(
+        @retrofit2.http.Path("deviceId") deviceId: Long
+    ): Response<ApiResponseDto<BatteryHistoryResponseDto>>
+
+    @GET("api/v1/battery/trends/{deviceId}")
+    suspend fun getBatteryTrends(
+        @retrofit2.http.Path("deviceId") deviceId: Long
+    ): Response<ApiResponseDto<BatteryTrendResponseDto>>
 }

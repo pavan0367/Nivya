@@ -17,6 +17,7 @@ import com.nivya.ui.alerts.ParentAlertsScreen
 import com.nivya.ui.auth.LoginScreen
 import com.nivya.ui.auth.LoginViewModel
 import com.nivya.ui.battery.ChildBatteryScreen
+import com.nivya.ui.battery.ChildBatteryViewModel
 import com.nivya.ui.cleanup.ChildCleanUpScreen
 import com.nivya.ui.common.*
 import com.nivya.ui.convocation.ChildConvocationScreen
@@ -24,6 +25,7 @@ import com.nivya.ui.convocation.ParentConvocationScreen
 import com.nivya.ui.dashboard.*
 import com.nivya.ui.device_health.ChildDeviceHealthScreen
 import com.nivya.ui.device_health.ParentDeviceHealthScreen
+import com.nivya.ui.device_health.ParentDeviceHealthViewModel
 import com.nivya.ui.location.ChildLocationScreen
 import com.nivya.ui.location.ParentLocationScreen
 import com.nivya.ui.network.ChildNetworkScreen
@@ -255,7 +257,10 @@ fun AppNavGraph(
                     ParentLocationScreen()
                 }
                 composable(route = NavigationDestination.ParentDeviceHealth.route) {
-                    ParentDeviceHealthScreen()
+                    val healthViewModel: ParentDeviceHealthViewModel = viewModel(
+                        factory = ParentDeviceHealthViewModel.provideFactory(appContainer.batteryRepository)
+                    )
+                    ParentDeviceHealthScreen(viewModel = healthViewModel)
                 }
                 composable(route = NavigationDestination.ParentNetwork.route) {
                     ParentNetworkScreen()
@@ -282,7 +287,10 @@ fun AppNavGraph(
                     ChildDashboardScreen(onNavigateTo = { dest -> navController.navigate(dest.route) })
                 }
                 composable(route = NavigationDestination.ChildBattery.route) {
-                    ChildBatteryScreen()
+                    val batteryViewModel: ChildBatteryViewModel = viewModel(
+                        factory = ChildBatteryViewModel.provideFactory(appContainer.batteryRepository)
+                    )
+                    ChildBatteryScreen(viewModel = batteryViewModel)
                 }
                 composable(route = NavigationDestination.ChildScreenTime.route) {
                     ChildScreenTimeScreen()

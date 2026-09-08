@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.work.Configuration
 import com.nivya.core.di.AppContainer
 import com.nivya.core.di.DefaultAppContainer
+import com.nivya.services.sync.BatterySyncWorker
 
 /**
  * Root Application class initializing the DI container and WorkManager configuration.
@@ -16,6 +17,7 @@ class NivyaApp : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         container = DefaultAppContainer(this)
+        BatterySyncWorker.schedulePeriodic(this)
     }
 
     override val workManagerConfiguration: Configuration
