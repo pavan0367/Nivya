@@ -112,6 +112,9 @@ class DeviceHealthIntegrationTest {
     private com.nivya.alerts.repository.AlertRuleRepository alertRuleRepository;
 
     @Autowired
+    private com.nivya.activity.repository.ActivityEventRepository activityEventRepository;
+
+    @Autowired
     private ConsentRepository consentRepository;
 
     @Autowired
@@ -195,6 +198,7 @@ class DeviceHealthIntegrationTest {
         notificationRecordRepository.deleteAll();
         alertRuleRepository.deleteAll();
         alertRepository.deleteAll();
+        activityEventRepository.deleteAll();
         deviceStatusRepository.deleteAll();
         deviceRepository.deleteAll();
         consentRepository.deleteAll();

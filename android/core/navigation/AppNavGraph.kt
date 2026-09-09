@@ -253,7 +253,10 @@ fun AppNavGraph(
                     ParentDashboardScreen(onNavigateTo = { dest -> navController.navigate(dest.route) })
                 }
                 composable(route = NavigationDestination.ParentLiveActivity.route) {
-                    ParentLiveActivityScreen()
+                    val liveActivityViewModel: ParentLiveActivityViewModel = viewModel(
+                        factory = ParentLiveActivityViewModel.provideFactory(appContainer.liveActivityRepository)
+                    )
+                    ParentLiveActivityScreen(viewModel = liveActivityViewModel)
                 }
                 composable(route = NavigationDestination.ParentHistory.route) {
                     ParentHistoryScreen()

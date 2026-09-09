@@ -89,6 +89,9 @@ class PairingIntegrationTest {
     @Autowired
     private com.nivya.location.repository.LocationStatusRepository locationStatusRepository;
 
+    @Autowired
+    private com.nivya.activity.repository.ActivityEventRepository activityEventRepository;
+
     @BeforeEach
     void setUp() {
         rateLimiter.clearAll();
@@ -98,6 +101,7 @@ class PairingIntegrationTest {
 
         consentRepository.deleteAll();
         pairingRequestRepository.deleteAll();
+        activityEventRepository.deleteAll();
         deviceStatusRepository.deleteAll();
         deviceRepository.deleteAll();
         familyMemberRepository.deleteAll();

@@ -21,9 +21,11 @@ import com.nivya.core.database.entities.UsageEntity
 
 import com.nivya.core.database.dao.AlertDao
 import com.nivya.core.database.entities.AlertEntity
+import com.nivya.core.database.dao.ActivityDao
+import com.nivya.core.database.entities.ActivityEntity
 
 /**
- * Room Database caching family links, device telemetry, battery offline queue, network queue, usage stats, location, device health, and safety alerts.
+ * Room Database caching family links, device telemetry, battery offline queue, network queue, usage stats, location, device health, safety alerts, and live activity.
  */
 @Database(
     entities = [
@@ -34,9 +36,10 @@ import com.nivya.core.database.entities.AlertEntity
         UsageEntity::class,
         LocationEntity::class,
         DeviceHealthEntity::class,
-        AlertEntity::class
+        AlertEntity::class,
+        ActivityEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class NivyaDatabase : RoomDatabase() {
@@ -49,6 +52,7 @@ abstract class NivyaDatabase : RoomDatabase() {
     abstract fun locationDao(): LocationDao
     abstract fun deviceHealthDao(): DeviceHealthDao
     abstract fun alertDao(): AlertDao
+    abstract fun activityDao(): ActivityDao
 
 
     companion object {

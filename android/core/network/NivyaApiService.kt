@@ -189,6 +189,17 @@ interface NivyaApiService {
         @retrofit2.http.Path("ruleId") ruleId: Long,
         @Body request: UpdateAlertRuleRequestDto
     ): Response<ApiResponseDto<AlertRuleDto>>
+
+    // --- Live Activity (Parent only query, Device telemetry) ---
+    @POST("api/v1/activity/telemetry")
+    suspend fun sendActivityTelemetry(
+        @Body request: LiveActivityRequestDto
+    ): Response<ApiResponseDto<ActivityEventDto>>
+
+    @GET("api/v1/activity/live/{deviceId}")
+    suspend fun getLiveActivity(
+        @retrofit2.http.Path("deviceId") deviceId: Long
+    ): Response<ApiResponseDto<LiveActivityResponseDto>>
 }
 
 

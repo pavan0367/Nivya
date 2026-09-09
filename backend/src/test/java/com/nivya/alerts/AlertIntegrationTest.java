@@ -115,6 +115,9 @@ class AlertIntegrationTest {
     private UsageAppRepository usageAppRepository;
 
     @Autowired
+    private com.nivya.activity.repository.ActivityEventRepository activityEventRepository;
+
+    @Autowired
     private DeviceHealthRepository deviceHealthRepository;
 
     @Autowired
@@ -197,6 +200,7 @@ class AlertIntegrationTest {
         batteryHistoryRepository.deleteAll();
         batteryStatusRepository.deleteAll();
         alertRepository.deleteAll();
+        activityEventRepository.deleteAll();
         deviceStatusRepository.deleteAll();
         deviceRepository.deleteAll();
         consentRepository.deleteAll();
