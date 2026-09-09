@@ -227,6 +227,32 @@ interface NivyaApiService {
     suspend fun sendHistoryEvent(
         @Body request: RecordHistoryRequestDto
     ): Response<ApiResponseDto<HistoryEventDto>>
+
+    // --- Convocation (Priority Family Communication & Ephemeral Viewing) ---
+    @POST("api/v1/convocation/parent/send")
+    suspend fun parentSendConvocationMessage(
+        @Body request: ParentSendMessageRequestDto
+    ): Response<ApiResponseDto<ParentConvocationMessageDto>>
+
+    @GET("api/v1/convocation/parent/history")
+    suspend fun parentGetConvocationHistory(): Response<ApiResponseDto<List<ParentConvocationMessageDto>>>
+
+    @GET("api/v1/convocation/parent/seen")
+    suspend fun parentGetConvocationSeenState(): Response<ApiResponseDto<Map<String, Boolean>>>
+
+    @GET("api/v1/convocation/child/unread")
+    suspend fun childGetConvocationUnread(): Response<ApiResponseDto<List<ChildConvocationMessageDto>>>
+
+    @POST("api/v1/convocation/child/view/start")
+    suspend fun childStartConvocationViewing(): Response<ApiResponseDto<ChildViewingSessionResponseDto>>
+
+    @POST("api/v1/convocation/child/send")
+    suspend fun childSendConvocationMessage(
+        @Body request: ChildSendMessageRequestDto
+    ): Response<ApiResponseDto<Map<String, Any>>>
+
+    @GET("api/v1/convocation/child/visibility")
+    suspend fun childGetConvocationVisibility(): Response<ApiResponseDto<ChildVisibilityStateResponseDto>>
 }
 
 
