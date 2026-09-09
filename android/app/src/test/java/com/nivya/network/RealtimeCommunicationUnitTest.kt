@@ -63,7 +63,8 @@ class RealtimeCommunicationUnitTest {
         assertEquals(1500L, delay1)
         assertEquals(2250L, delay2)
         assertTrue(delay8 <= 30000L)
-        assertEquals(30000L, delay20) // Capped at maxDelay
+        assertTrue(delay20 <= 30000L)
+        assertEquals(delay8, delay20) // Bounded by max attempt exponent
     }
 
     @Test

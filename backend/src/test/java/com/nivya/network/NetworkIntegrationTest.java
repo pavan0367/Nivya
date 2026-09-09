@@ -103,6 +103,9 @@ class NetworkIntegrationTest {
     @Autowired
     private com.nivya.history.repository.HistoryEventRepository historyEventRepository;
 
+    @Autowired
+    private com.nivya.pairing.repository.PairingRequestRepository pairingRequestRepository;
+
     private User parentUser;
     private User childUser;
     private Family family;
@@ -124,6 +127,7 @@ class NetworkIntegrationTest {
         alertRepository.deleteAll();
         activityEventRepository.deleteAll();
         historyEventRepository.deleteAll();
+        pairingRequestRepository.deleteAll();
         deviceStatusRepository.deleteAll();
         deviceRepository.deleteAll();
         consentRepository.deleteAll();

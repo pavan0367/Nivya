@@ -198,6 +198,11 @@ public class RealtimeCommunicationIntegrationTest {
         deviceRepository.save(childDevice);
     }
 
+    @org.junit.jupiter.api.AfterEach
+    void tearDown() {
+        cleanDatabases();
+    }
+
     @Test
     @DisplayName("STOMP CONNECT with valid Bearer JWT authenticates and populates accessor user")
     void testConnectAuthenticationWithValidJwt() {
