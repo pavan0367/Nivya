@@ -69,7 +69,7 @@ export const PairingScreen: React.FC<PairingScreenProps> = ({
     return () => clearInterval(timer);
   }, [ttlSeconds]);
 
-  const getAuthHeader = () => {
+  const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('accessToken');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   };
