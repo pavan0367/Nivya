@@ -47,6 +47,7 @@ public class AlertService {
     private final FamilyMemberRepository familyMemberRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final PushNotificationService pushNotificationService;
+    private final com.nivya.websocket.service.RealtimeBroadcastService realtimeBroadcastService;
 
     public AlertService(AlertRepository alertRepository,
                         AlertRuleRepository alertRuleRepository,
@@ -55,7 +56,8 @@ public class AlertService {
                         FamilyRepository familyRepository,
                         FamilyMemberRepository familyMemberRepository,
                         SimpMessagingTemplate messagingTemplate,
-                        PushNotificationService pushNotificationService) {
+                        PushNotificationService pushNotificationService,
+                        com.nivya.websocket.service.RealtimeBroadcastService realtimeBroadcastService) {
         this.alertRepository = alertRepository;
         this.alertRuleRepository = alertRuleRepository;
         this.notificationRecordRepository = notificationRecordRepository;
@@ -64,6 +66,7 @@ public class AlertService {
         this.familyMemberRepository = familyMemberRepository;
         this.messagingTemplate = messagingTemplate;
         this.pushNotificationService = pushNotificationService;
+        this.realtimeBroadcastService = realtimeBroadcastService;
     }
 
     /**
@@ -310,12 +313,22 @@ public class AlertService {
         try {
             if (alert.getFamily() != null) {
                 messagingTemplate.convertAndSend("/topic/alerts/family/" + alert.getFamily().getId(), response);
+                messagingTemplate.convertAndSend("/topic/alerts/" + alert.getFamily().getId(), response);
             }
             if (alert.getDevice() != null) {
                 messagingTemplate.convertAndSend("/topic/alerts/device/" + alert.getDevice().getId(), response);
             }
         } catch (Exception e) {
             log.warn("Failed to broadcast alert event over WebSocket: {}", e.getMessage());
+        }
+
+        // Real-time broadcast service (Redis PubSub)
+        if (alert.getFamily() != null) {
+            realtimeBroadcastService.broadcastAlert(
+                    alert.getFamily().getId(),
+                    alert.getDevice() != null ? alert.getDevice().getId() : null,
+                    response
+            );
         }
     }
 

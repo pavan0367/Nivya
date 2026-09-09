@@ -39,6 +39,7 @@ public class BatteryService {
     private final AlertService alertService;
     private final FamilyMemberRepository familyMemberRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final com.nivya.websocket.service.RealtimeBroadcastService realtimeBroadcastService;
 
     public BatteryService(BatteryStatusRepository batteryStatusRepository,
                           BatteryHistoryRepository batteryHistoryRepository,
@@ -46,7 +47,8 @@ public class BatteryService {
                           DeviceStatusRepository deviceStatusRepository,
                           AlertService alertService,
                           FamilyMemberRepository familyMemberRepository,
-                          SimpMessagingTemplate messagingTemplate) {
+                          SimpMessagingTemplate messagingTemplate,
+                          com.nivya.websocket.service.RealtimeBroadcastService realtimeBroadcastService) {
         this.batteryStatusRepository = batteryStatusRepository;
         this.batteryHistoryRepository = batteryHistoryRepository;
         this.deviceRepository = deviceRepository;
@@ -54,6 +56,7 @@ public class BatteryService {
         this.alertService = alertService;
         this.familyMemberRepository = familyMemberRepository;
         this.messagingTemplate = messagingTemplate;
+        this.realtimeBroadcastService = realtimeBroadcastService;
     }
 
     @Transactional
@@ -99,6 +102,8 @@ public class BatteryService {
         );
         batteryHistoryRepository.save(history);
 
+        BatteryStatusResponse response = mapToResponse(status);
+
         // 4. Low-Battery Safety Alert generation / resolution
         if (device.getFamily() != null) {
             handleLowBatteryAlert(device, pct, isLowBattery);
@@ -110,12 +115,18 @@ public class BatteryService {
             try {
                 messagingTemplate.convertAndSend("/topic/family/" + device.getFamily().getId() + "/battery", event);
                 messagingTemplate.convertAndSend("/topic/device/" + device.getId() + "/battery", event);
+                messagingTemplate.convertAndSend("/topic/battery/" + device.getId(), response);
             } catch (Exception e) {
                 log.warn("Failed to broadcast WebSocket battery update: {}", e.getMessage());
             }
+
+            // Real-time broadcast service (Redis PubSub + transient store)
+            realtimeBroadcastService.broadcastBatteryUpdate(device.getId(), device.getFamily().getId(), response);
+        } else {
+            realtimeBroadcastService.broadcastBatteryUpdate(device.getId(), null, response);
         }
 
-        return mapToResponse(status);
+        return response;
     }
 
     @Transactional(readOnly = true)

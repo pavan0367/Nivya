@@ -14,10 +14,11 @@ import {
   Smartphone,
   Wifi,
   WifiOff,
+  RefreshCw,
 } from 'lucide-react';
 import { authService } from '../services/authService';
 import { alertService } from '../services/alertService';
-import { websocketService } from '../services/websocketService';
+import { websocketService, WebSocketConnectionStatus } from '../services/websocketService';
 import { Device, User } from '../types/auth';
 
 interface NavItem {
@@ -44,7 +45,7 @@ export const DashboardLayout: React.FC = () => {
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
   const [unreadAlerts, setUnreadAlerts] = useState<number>(0);
-  const [isWsConnected, setIsWsConnected] = useState<boolean>(false);
+  const [wsStatus, setWsStatus] = useState<WebSocketConnectionStatus>(websocketService.getStatus());
 
   useEffect(() => {
     const user = authService.getCurrentUser();
@@ -70,12 +71,12 @@ export const DashboardLayout: React.FC = () => {
 
     // Connect WebSocket
     websocketService.connect();
-    const unsubConn = websocketService.onConnectionChange((connected) => {
-      setIsWsConnected(connected);
+    const unsubStatus = websocketService.onStatusChange((status) => {
+      setWsStatus(status);
     });
 
     return () => {
-      unsubConn();
+      unsubStatus();
     };
   }, [navigate]);
 
@@ -187,11 +188,29 @@ export const DashboardLayout: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             {/* Live STOMP Indicator */}
             <span
-              className={`badge ${isWsConnected ? 'badge-success' : 'badge-neutral'}`}
-              title={isWsConnected ? 'Real-time WebSocket telemetry connected' : 'Connecting to WebSocket...'}
+              className={`badge ${
+                wsStatus === 'CONNECTED'
+                  ? 'badge-success'
+                  : wsStatus === 'RECONNECTING'
+                  ? 'badge-warning'
+                  : 'badge-neutral'
+              }`}
+              title={`WebSocket status: ${wsStatus}`}
             >
-              {isWsConnected ? <Wifi size={13} /> : <WifiOff size={13} />}
-              {isWsConnected ? 'Live' : 'Connecting'}
+              {wsStatus === 'CONNECTED' ? (
+                <Wifi size={13} />
+              ) : wsStatus === 'RECONNECTING' ? (
+                <RefreshCw size={13} className="spin" />
+              ) : (
+                <WifiOff size={13} />
+              )}
+              {wsStatus === 'CONNECTED'
+                ? 'Live'
+                : wsStatus === 'RECONNECTING'
+                ? 'Reconnecting'
+                : wsStatus === 'CONNECTING'
+                ? 'Connecting'
+                : 'Offline'}
             </span>
 
             {/* Quick Unread Alert Icon */}

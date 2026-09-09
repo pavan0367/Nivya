@@ -61,3 +61,16 @@ export interface DeviceHealth {
   };
   recordedAt: string;
 }
+
+export interface DeviceTelemetrySnapshot {
+  deviceId: number;
+  isOnline: boolean;
+  status: string;
+  battery?: BatteryStatus | null;
+  network?: NetworkStatus | null;
+  location?: LocationStatus | null;
+  activity?: any | null;
+  deviceHealth?: DeviceHealth | null;
+  lastUpdated?: string;
+}
+

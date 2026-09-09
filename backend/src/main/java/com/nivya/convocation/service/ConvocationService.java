@@ -15,6 +15,7 @@ import com.nivya.role.RoleType;
 import com.nivya.security.UserPrincipal;
 import com.nivya.user.entity.User;
 import com.nivya.user.repository.UserRepository;
+import com.nivya.websocket.service.RealtimeBroadcastService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
@@ -46,19 +47,22 @@ public class ConvocationService {
     private final UserRepository userRepository;
     private final DeviceRepository deviceRepository;
     private final PushNotificationService pushNotificationService;
+    private final RealtimeBroadcastService realtimeBroadcastService;
 
     public ConvocationService(ConvocationMessageRepository messageRepository,
                               ConvocationViewRepository viewRepository,
                               FamilyMemberRepository familyMemberRepository,
                               UserRepository userRepository,
                               DeviceRepository deviceRepository,
-                              PushNotificationService pushNotificationService) {
+                              PushNotificationService pushNotificationService,
+                              RealtimeBroadcastService realtimeBroadcastService) {
         this.messageRepository = messageRepository;
         this.viewRepository = viewRepository;
         this.familyMemberRepository = familyMemberRepository;
         this.userRepository = userRepository;
         this.deviceRepository = deviceRepository;
         this.pushNotificationService = pushNotificationService;
+        this.realtimeBroadcastService = realtimeBroadcastService;
     }
 
     // =========================================================================
@@ -102,7 +106,9 @@ public class ConvocationService {
             }
         }
 
-        return toParentDto(message, principal.getName());
+        ParentConvocationMessageDto dto = toParentDto(message, principal.getName());
+        realtimeBroadcastService.broadcastConvocationMessage(familyId, dto);
+        return dto;
     }
 
     /**
@@ -202,6 +208,9 @@ public class ConvocationService {
             viewRepository.save(view);
             log.info("Child {} started 2-minute viewing session {} for {} messages",
                     principal.getId(), sessionUuid, unreadMessages.size());
+
+            List<Long> seenIds = unreadMessages.stream().map(ConvocationMessage::getId).collect(Collectors.toList());
+            realtimeBroadcastService.broadcastConvocationSeen(familyId, seenIds, now.toString());
         }
 
         // 2. Fetch all actively visible messages (2-minute server window + 1-hour absolute window)
@@ -252,6 +261,10 @@ public class ConvocationService {
 
         messageRepository.save(message);
         log.info("Child {} sent convocation message {} to parent {}", principal.getId(), message.getId(), parentMember.getUser().getId());
+
+        String senderName = childMember.getUser() != null ? childMember.getUser().getName() : "Child";
+        ParentConvocationMessageDto parentDto = toParentDto(message, senderName);
+        realtimeBroadcastService.broadcastConvocationMessage(familyId, parentDto);
 
         Map<String, Object> response = new HashMap<>();
         response.put("status", "DELIVERED");

@@ -45,6 +45,7 @@ public class LocationService {
     private final ConsentRepository consentRepository;
     private final AlertService alertService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final com.nivya.websocket.service.RealtimeBroadcastService realtimeBroadcastService;
 
     public LocationService(LocationStatusRepository locationStatusRepository,
                            LocationHistoryRepository locationHistoryRepository,
@@ -53,7 +54,8 @@ public class LocationService {
                            FamilyMemberRepository familyMemberRepository,
                            ConsentRepository consentRepository,
                            AlertService alertService,
-                           SimpMessagingTemplate messagingTemplate) {
+                           SimpMessagingTemplate messagingTemplate,
+                           com.nivya.websocket.service.RealtimeBroadcastService realtimeBroadcastService) {
         this.locationStatusRepository = locationStatusRepository;
         this.locationHistoryRepository = locationHistoryRepository;
         this.deviceRepository = deviceRepository;
@@ -62,6 +64,7 @@ public class LocationService {
         this.consentRepository = consentRepository;
         this.alertService = alertService;
         this.messagingTemplate = messagingTemplate;
+        this.realtimeBroadcastService = realtimeBroadcastService;
     }
 
     @Transactional
@@ -163,9 +166,15 @@ public class LocationService {
             try {
                 messagingTemplate.convertAndSend("/topic/family/" + device.getFamily().getId() + "/location", response);
                 messagingTemplate.convertAndSend("/topic/device/" + device.getId() + "/location", response);
+                messagingTemplate.convertAndSend("/topic/location/" + device.getId(), response);
             } catch (Exception e) {
                 log.warn("Failed to broadcast WebSocket location update: {}", e.getMessage());
             }
+
+            // Real-time broadcast service (Redis PubSub + transient store)
+            realtimeBroadcastService.broadcastLocationUpdate(device.getId(), device.getFamily().getId(), response);
+        } else {
+            realtimeBroadcastService.broadcastLocationUpdate(device.getId(), null, response);
         }
 
         log.info("Recorded location for device {}: lat={}, lng={}, provider={}, isStale={}",

@@ -41,6 +41,7 @@ public class NetworkService {
     private final FamilyMemberRepository familyMemberRepository;
     private final AlertService alertService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final com.nivya.websocket.service.RealtimeBroadcastService realtimeBroadcastService;
 
     public NetworkService(NetworkStatusRepository networkStatusRepository,
                           NetworkHistoryRepository networkHistoryRepository,
@@ -48,7 +49,8 @@ public class NetworkService {
                           DeviceStatusRepository deviceStatusRepository,
                           FamilyMemberRepository familyMemberRepository,
                           AlertService alertService,
-                          SimpMessagingTemplate messagingTemplate) {
+                          SimpMessagingTemplate messagingTemplate,
+                          com.nivya.websocket.service.RealtimeBroadcastService realtimeBroadcastService) {
         this.networkStatusRepository = networkStatusRepository;
         this.networkHistoryRepository = networkHistoryRepository;
         this.deviceRepository = deviceRepository;
@@ -56,6 +58,7 @@ public class NetworkService {
         this.familyMemberRepository = familyMemberRepository;
         this.alertService = alertService;
         this.messagingTemplate = messagingTemplate;
+        this.realtimeBroadcastService = realtimeBroadcastService;
     }
 
     @Transactional
@@ -198,11 +201,20 @@ public class NetworkService {
 
         // Push to device-specific topic
         messagingTemplate.convertAndSend("/topic/device/" + device.getId() + "/network", event);
+        messagingTemplate.convertAndSend("/topic/network/" + device.getId(), toResponse(status));
 
         // If part of family, broadcast to family-wide topic for parents
         if (device.getFamily() != null) {
             messagingTemplate.convertAndSend("/topic/family/" + device.getFamily().getId() + "/network", event);
         }
+
+        // Broadcast via Redis Pub/Sub & transient store
+        realtimeBroadcastService.broadcastNetworkUpdate(
+                device.getId(),
+                device.getFamily() != null ? device.getFamily().getId() : null,
+                toResponse(status),
+                status.isNetworkAvailable() && status.isInternetAvailable()
+        );
     }
 
     private void validateDeviceAccess(Device device, UserPrincipal principal) {

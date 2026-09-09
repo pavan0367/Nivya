@@ -23,6 +23,7 @@ import com.nivya.role.RoleType;
 import com.nivya.security.UserPrincipal;
 import com.nivya.user.entity.User;
 import com.nivya.user.repository.UserRepository;
+import com.nivya.websocket.service.RealtimeBroadcastService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -56,6 +57,7 @@ public class PairingService {
     private final ConsentRepository consentRepository;
     private final AuditLogRepository auditLogRepository;
     private final PairingRateLimiter rateLimiter;
+    private final RealtimeBroadcastService realtimeBroadcastService;
 
     public PairingService(PairingRequestRepository pairingRequestRepository,
                           UserRepository userRepository,
@@ -65,7 +67,8 @@ public class PairingService {
                           DeviceStatusRepository deviceStatusRepository,
                           ConsentRepository consentRepository,
                           AuditLogRepository auditLogRepository,
-                          PairingRateLimiter rateLimiter) {
+                          PairingRateLimiter rateLimiter,
+                          RealtimeBroadcastService realtimeBroadcastService) {
         this.pairingRequestRepository = pairingRequestRepository;
         this.userRepository = userRepository;
         this.familyRepository = familyRepository;
@@ -75,6 +78,7 @@ public class PairingService {
         this.consentRepository = consentRepository;
         this.auditLogRepository = auditLogRepository;
         this.rateLimiter = rateLimiter;
+        this.realtimeBroadcastService = realtimeBroadcastService;
     }
 
     /**
@@ -248,7 +252,9 @@ public class PairingService {
         log.info("Pairing complete between {} and {} into family {}",
                 currentUser.getEmail(), requester.getEmail(), family.getFamilyCode());
 
-        return buildStatusResponse(family, currentUser.getRole());
+        PairingStatusResponse response = buildStatusResponse(family, currentUser.getRole());
+        realtimeBroadcastService.broadcastPairingEvent(family.getId(), response);
+        return response;
     }
 
     /**
@@ -302,6 +308,9 @@ public class PairingService {
         ));
 
         log.info("Device {} revoked from family by {}", device.getDeviceUuid(), user.getEmail());
+
+        PairingStatusResponse statusResponse = buildStatusResponse(parentMembership.getFamily(), RoleType.PARENT);
+        realtimeBroadcastService.broadcastPairingEvent(parentMembership.getFamily().getId(), statusResponse);
     }
 
     // =========================================================================

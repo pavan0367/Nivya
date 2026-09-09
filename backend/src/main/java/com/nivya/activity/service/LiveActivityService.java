@@ -43,17 +43,20 @@ public class LiveActivityService {
     private final DeviceStatusRepository deviceStatusRepository;
     private final FamilyMemberRepository familyMemberRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final com.nivya.websocket.service.RealtimeBroadcastService realtimeBroadcastService;
 
     public LiveActivityService(ActivityEventRepository activityEventRepository,
                                DeviceRepository deviceRepository,
                                DeviceStatusRepository deviceStatusRepository,
                                FamilyMemberRepository familyMemberRepository,
-                               SimpMessagingTemplate messagingTemplate) {
+                               SimpMessagingTemplate messagingTemplate,
+                               com.nivya.websocket.service.RealtimeBroadcastService realtimeBroadcastService) {
         this.activityEventRepository = activityEventRepository;
         this.deviceRepository = deviceRepository;
         this.deviceStatusRepository = deviceStatusRepository;
         this.familyMemberRepository = familyMemberRepository;
         this.messagingTemplate = messagingTemplate;
+        this.realtimeBroadcastService = realtimeBroadcastService;
     }
 
     /**
@@ -210,8 +213,16 @@ public class LiveActivityService {
                 messagingTemplate.convertAndSend("/topic/family/" + device.getFamily().getId() + "/activity", eventDto);
             }
             messagingTemplate.convertAndSend("/topic/device/" + device.getId() + "/activity", eventDto);
+            messagingTemplate.convertAndSend("/topic/activity/" + device.getId(), eventDto);
         } catch (Exception e) {
             log.warn("Failed to broadcast activity update over WebSocket: {}", e.getMessage());
         }
+
+        // Real-time broadcast service (Redis PubSub + transient store)
+        realtimeBroadcastService.broadcastLiveActivity(
+                device.getId(),
+                device.getFamily() != null ? device.getFamily().getId() : null,
+                eventDto
+        );
     }
 }

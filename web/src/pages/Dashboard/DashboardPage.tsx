@@ -199,10 +199,37 @@ export const DashboardPage: React.FC = () => {
         }
       );
 
+      const unsubStatus = websocketService.subscribe(
+        `/topic/device/${activeDeviceId}/status`,
+        (msg: { deviceId: number; online: boolean; reason?: string }) => {
+          setIsOnline(msg.online);
+        }
+      );
+
+      // Rehydrate state snapshot immediately on WebSocket reconnection
+      const unsubReconnect = websocketService.onReconnect(async () => {
+        try {
+          const snapshot = await telemetryService.getSnapshot(activeDeviceId);
+          if (snapshot) {
+            if (snapshot.battery) setBattery(snapshot.battery);
+            if (snapshot.network) {
+              setNetwork(snapshot.network);
+              setIsOnline(snapshot.network.isInternetAvailable);
+            }
+            if (snapshot.location) setLocation(snapshot.location);
+            if (snapshot.isOnline !== undefined) setIsOnline(snapshot.isOnline);
+          }
+        } catch (err) {
+          loadData(false);
+        }
+      });
+
       return () => {
         unsubBattery();
         unsubNetwork();
         unsubLocation();
+        unsubStatus();
+        unsubReconnect();
       };
     }
   }, [activeDeviceId, loadData]);

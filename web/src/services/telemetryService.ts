@@ -1,8 +1,13 @@
 import { apiClient } from './api';
 import { ApiResponse } from '../types/auth';
-import { BatteryStatus, NetworkStatus, LocationStatus, UsageSummary, DeviceHealth } from '../types/telemetry';
+import { BatteryStatus, NetworkStatus, LocationStatus, UsageSummary, DeviceHealth, DeviceTelemetrySnapshot } from '../types/telemetry';
 
 export const telemetryService = {
+  async getSnapshot(deviceId: number): Promise<DeviceTelemetrySnapshot> {
+    const response = await apiClient.get<ApiResponse<DeviceTelemetrySnapshot>>(`/telemetry/snapshot/${deviceId}`);
+    return response.data.data!;
+  },
+
   async getBatteryStatus(deviceId: number): Promise<BatteryStatus> {
     const response = await apiClient.get<ApiResponse<BatteryStatus>>(`/battery/current/${deviceId}`);
     return response.data.data!;
