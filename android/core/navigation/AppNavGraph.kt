@@ -19,6 +19,7 @@ import com.nivya.ui.auth.LoginViewModel
 import com.nivya.ui.battery.ChildBatteryScreen
 import com.nivya.ui.battery.ChildBatteryViewModel
 import com.nivya.ui.cleanup.ChildCleanUpScreen
+import com.nivya.ui.cleanup.ChildCleanUpViewModel
 import com.nivya.ui.common.*
 import com.nivya.ui.convocation.ChildConvocationScreen
 import com.nivya.ui.convocation.ParentConvocationScreen
@@ -340,7 +341,10 @@ fun AppNavGraph(
                     ChildDeviceHealthScreen(viewModel = childHealthViewModel)
                 }
                 composable(route = NavigationDestination.ChildCleanUp.route) {
-                    ChildCleanUpScreen()
+                    val cleanUpViewModel: ChildCleanUpViewModel = viewModel(
+                        factory = ChildCleanUpViewModel.provideFactory(appContainer.cleanUpRepository)
+                    )
+                    ChildCleanUpScreen(viewModel = cleanUpViewModel)
                 }
                 composable(route = NavigationDestination.ChildAlerts.route) {
                     ChildAlertsScreen()

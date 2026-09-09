@@ -10,6 +10,7 @@ import com.nivya.core.security.SecureTokenStorage
 import com.nivya.data.local.UserPreferencesDataStore
 import com.nivya.data.repository.AuthRepository
 import com.nivya.data.repository.BatteryRepository
+import com.nivya.data.repository.CleanUpRepository
 import com.nivya.data.repository.DeviceHealthRepository
 import com.nivya.data.repository.LocationRepository
 import com.nivya.data.repository.NetworkRepository
@@ -40,6 +41,7 @@ interface AppContainer {
     val usageRepository: UsageRepository
     val locationRepository: LocationRepository
     val deviceHealthRepository: DeviceHealthRepository
+    val cleanUpRepository: CleanUpRepository
 }
 
 
@@ -126,6 +128,10 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
 
     override val deviceHealthRepository: DeviceHealthRepository by lazy {
         DeviceHealthRepository(context, apiService, tokenStorage, database, networkMonitor)
+    }
+
+    override val cleanUpRepository: CleanUpRepository by lazy {
+        CleanUpRepository(context)
     }
 }
 
