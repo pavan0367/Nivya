@@ -69,6 +69,10 @@ nivya:
     view-duration-seconds: ${CONVOCATION_VIEW_MODE_DURATION_SECONDS:120}
     child-viewed-expiry-hours: ${CONVOCATION_CHILD_VIEWED_EXPIRY_HOURS:1}
     child-notification-text: ${CONVOCATION_CHILD_NOTIFICATION_TEXT:Check your battery status}
+  firebase:
+    enabled: ${FIREBASE_ENABLED:true}
+    credentials-path: ${FIREBASE_CREDENTIALS_PATH:}
+    credentials-json: ${FIREBASE_CREDENTIALS_JSON:}
 
 # Actuator Endpoints Configuration
 management:

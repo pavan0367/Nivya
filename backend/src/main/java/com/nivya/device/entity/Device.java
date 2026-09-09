@@ -41,7 +41,7 @@ public class Device {
     @Column(name = "app_version", length = 50)
     private String appVersion;
 
-    @Column(name = "push_token", length = 255)
+    @Column(name = "push_token", length = 1024)
     private String pushToken;
 
     @Column(nullable = false, length = 20)

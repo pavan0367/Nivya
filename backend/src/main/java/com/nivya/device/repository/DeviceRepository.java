@@ -19,4 +19,10 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
     Optional<Device> findByUserIdAndPlatform(Long userId, String platform);
 
     Optional<Device> findFirstByUserIdOrderByIdAsc(Long userId);
+
+    Optional<Device> findByUserIdAndDeviceUuid(Long userId, String deviceUuid);
+
+    Optional<Device> findByPushToken(String pushToken);
+
+    List<Device> findAllByPushToken(String pushToken);
 }

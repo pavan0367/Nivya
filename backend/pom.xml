@@ -113,6 +113,13 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Firebase Admin SDK for FCM Push Notifications -->
+        <dependency>
+            <groupId>com.google.firebase</groupId>
+            <artifactId>firebase-admin</artifactId>
+            <version>9.3.0</version>
+        </dependency>
+
         <!-- Testing Dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

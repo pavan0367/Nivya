@@ -14,6 +14,7 @@ import com.nivya.family.entity.Family;
 import com.nivya.family.entity.FamilyMember;
 import com.nivya.family.repository.FamilyMemberRepository;
 import com.nivya.family.repository.FamilyRepository;
+import com.nivya.notification.service.PushNotificationService;
 import com.nivya.security.UserPrincipal;
 import com.nivya.role.RoleType;
 import org.slf4j.Logger;
@@ -45,6 +46,7 @@ public class AlertService {
     private final FamilyRepository familyRepository;
     private final FamilyMemberRepository familyMemberRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final PushNotificationService pushNotificationService;
 
     public AlertService(AlertRepository alertRepository,
                         AlertRuleRepository alertRuleRepository,
@@ -52,7 +54,8 @@ public class AlertService {
                         DeviceRepository deviceRepository,
                         FamilyRepository familyRepository,
                         FamilyMemberRepository familyMemberRepository,
-                        SimpMessagingTemplate messagingTemplate) {
+                        SimpMessagingTemplate messagingTemplate,
+                        PushNotificationService pushNotificationService) {
         this.alertRepository = alertRepository;
         this.alertRuleRepository = alertRuleRepository;
         this.notificationRecordRepository = notificationRecordRepository;
@@ -60,6 +63,7 @@ public class AlertService {
         this.familyRepository = familyRepository;
         this.familyMemberRepository = familyMemberRepository;
         this.messagingTemplate = messagingTemplate;
+        this.pushNotificationService = pushNotificationService;
     }
 
     /**
@@ -255,12 +259,46 @@ public class AlertService {
             for (FamilyMember fm : members) {
                 if (fm.getMemberRole() == RoleType.PARENT && fm.getUser() != null) {
                     notifications.add(new NotificationRecord(alert, fm.getUser(), "IN_APP", "SENT"));
+
+                    // Dispatch push notifications to Parent's registered devices
+                    List<Device> parentDevices = deviceRepository.findByUserId(fm.getUser().getId());
+                    for (Device pDev : parentDevices) {
+                        if (pDev.getPushToken() != null && !pDev.getPushToken().isBlank()) {
+                            boolean sent = pushNotificationService.sendAlertNotification(
+                                    pDev.getPushToken(),
+                                    alert.getAlertType(),
+                                    alert.getSeverity(),
+                                    alert.getTitle(),
+                                    alert.getMessage()
+                            );
+                            if (sent) {
+                                notifications.add(new NotificationRecord(alert, fm.getUser(), "PUSH", "SENT"));
+                            }
+                        }
+                    }
                 }
             }
         }
 
         if (("CHILD".equalsIgnoreCase(targetRole) || "ALL".equalsIgnoreCase(targetRole)) && device.getUser() != null) {
             notifications.add(new NotificationRecord(alert, device.getUser(), "IN_APP", "SENT"));
+
+            // Dispatch push notification to Child's registered device(s)
+            List<Device> childDevices = deviceRepository.findByUserId(device.getUser().getId());
+            for (Device cDev : childDevices) {
+                if (cDev.getPushToken() != null && !cDev.getPushToken().isBlank()) {
+                    boolean sent = pushNotificationService.sendAlertNotification(
+                            cDev.getPushToken(),
+                            alert.getAlertType(),
+                            alert.getSeverity(),
+                            alert.getTitle(),
+                            alert.getMessage()
+                    );
+                    if (sent) {
+                        notifications.add(new NotificationRecord(alert, device.getUser(), "PUSH", "SENT"));
+                    }
+                }
+            }
         }
 
         if (!notifications.isEmpty()) {

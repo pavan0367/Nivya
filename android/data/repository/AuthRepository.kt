@@ -83,6 +83,13 @@ class AuthRepository(
     suspend fun logout(): NetworkResult<Unit> {
         return withContext(Dispatchers.IO) {
             try {
+                // 1. Unregister FCM Push Token on backend before session purge
+                val deviceUuid = tokenStorage.getDeviceUuid()
+                apiService.unregisterPushToken(UnregisterPushTokenRequestDto(deviceUuid))
+            } catch (_: Exception) {
+                // Best effort unregister
+            }
+            try {
                 val refreshToken = tokenStorage.getRefreshToken()
                 if (!refreshToken.isNullOrBlank()) {
                     apiService.logout(RefreshTokenRequestDto(refreshToken))
@@ -96,6 +103,29 @@ class AuthRepository(
                 database.deviceStatusDao().clearDevices()
             }
             NetworkResult.Success(Unit)
+        }
+    }
+
+    suspend fun syncPushToken(token: String): NetworkResult<PushTokenResponseDto> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val deviceUuid = tokenStorage.getDeviceUuid()
+                val response = apiService.registerPushToken(
+                    RegisterPushTokenRequestDto(
+                        deviceUuid = deviceUuid,
+                        pushToken = token,
+                        platform = "ANDROID",
+                        deviceName = android.os.Build.MODEL
+                    )
+                )
+                if (response.isSuccessful && response.body()?.data != null) {
+                    NetworkResult.Success(response.body()!!.data!!)
+                } else {
+                    NetworkResult.Error(code = response.code(), message = response.message())
+                }
+            } catch (e: Exception) {
+                NetworkResult.Exception(e)
+            }
         }
     }
 

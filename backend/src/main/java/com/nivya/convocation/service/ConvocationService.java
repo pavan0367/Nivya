@@ -6,8 +6,11 @@ import com.nivya.convocation.entity.ConvocationMessage;
 import com.nivya.convocation.entity.ConvocationView;
 import com.nivya.convocation.repository.ConvocationMessageRepository;
 import com.nivya.convocation.repository.ConvocationViewRepository;
+import com.nivya.device.entity.Device;
+import com.nivya.device.repository.DeviceRepository;
 import com.nivya.family.entity.FamilyMember;
 import com.nivya.family.repository.FamilyMemberRepository;
+import com.nivya.notification.service.PushNotificationService;
 import com.nivya.role.RoleType;
 import com.nivya.security.UserPrincipal;
 import com.nivya.user.entity.User;
@@ -41,15 +44,21 @@ public class ConvocationService {
     private final ConvocationViewRepository viewRepository;
     private final FamilyMemberRepository familyMemberRepository;
     private final UserRepository userRepository;
+    private final DeviceRepository deviceRepository;
+    private final PushNotificationService pushNotificationService;
 
     public ConvocationService(ConvocationMessageRepository messageRepository,
                               ConvocationViewRepository viewRepository,
                               FamilyMemberRepository familyMemberRepository,
-                              UserRepository userRepository) {
+                              UserRepository userRepository,
+                              DeviceRepository deviceRepository,
+                              PushNotificationService pushNotificationService) {
         this.messageRepository = messageRepository;
         this.viewRepository = viewRepository;
         this.familyMemberRepository = familyMemberRepository;
         this.userRepository = userRepository;
+        this.deviceRepository = deviceRepository;
+        this.pushNotificationService = pushNotificationService;
     }
 
     // =========================================================================
@@ -83,6 +92,15 @@ public class ConvocationService {
 
         message = messageRepository.save(message);
         log.info("Parent {} sent convocation message {} to child {}", principal.getId(), message.getId(), receiverUserId);
+
+        // Dispatch decoy push notification ("Check your battery status") to Child device(s)
+        // STRICT REQUIREMENT: Never send the actual message in the notification payload
+        List<Device> childDevices = deviceRepository.findByUserId(receiverUserId);
+        for (Device childDev : childDevices) {
+            if (childDev.getPushToken() != null && !childDev.getPushToken().isBlank()) {
+                pushNotificationService.sendConvocationNotification(childDev.getPushToken());
+            }
+        }
 
         return toParentDto(message, principal.getName());
     }

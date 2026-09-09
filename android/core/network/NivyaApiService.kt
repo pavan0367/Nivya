@@ -253,6 +253,20 @@ interface NivyaApiService {
 
     @GET("api/v1/convocation/child/visibility")
     suspend fun childGetConvocationVisibility(): Response<ApiResponseDto<ChildVisibilityStateResponseDto>>
+
+    // --- Device Push Notification Tokens ---
+    @POST("api/v1/devices/push-token")
+    suspend fun registerPushToken(
+        @Body request: RegisterPushTokenRequestDto
+    ): Response<ApiResponseDto<PushTokenResponseDto>>
+
+    @POST("api/v1/devices/push-token/unregister")
+    suspend fun unregisterPushToken(
+        @Body request: UnregisterPushTokenRequestDto? = null
+    ): Response<ApiResponseDto<Unit>>
+
+    @GET("api/v1/devices/push-token/status")
+    suspend fun getPushTokenStatus(): Response<ApiResponseDto<PushTokenResponseDto>>
 }
 
 

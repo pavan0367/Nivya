@@ -89,6 +89,7 @@ public class NetworkService {
 
         // 2. Synchronize overarching DeviceStatus (online status, network type, network quality)
         Optional<DeviceStatus> deviceStatusOpt = deviceStatusRepository.findByDeviceId(device.getId());
+        boolean wasOffline = deviceStatusOpt.isPresent() && !deviceStatusOpt.get().isOnline();
         if (deviceStatusOpt.isPresent()) {
             DeviceStatus ds = deviceStatusOpt.get();
             ds.setOnline(isNetAvail && isInternetAvail);
@@ -101,8 +102,8 @@ public class NetworkService {
         // 2b. Handle Offline / Online Alert transitions
         if (device.getFamily() != null) {
             boolean isOnline = isNetAvail && isInternetAvail;
+            String devName = device.getDeviceName() != null ? device.getDeviceName() : "Device";
             if (!isOnline) {
-                String devName = device.getDeviceName() != null ? device.getDeviceName() : "Device";
                 alertService.triggerOrUpdateAlert(
                         device.getFamily(),
                         device,
@@ -114,6 +115,17 @@ public class NetworkService {
                 );
             } else {
                 alertService.resolveAlert(device.getId(), "OFFLINE");
+                if (wasOffline) {
+                    alertService.triggerOrUpdateAlert(
+                            device.getFamily(),
+                            device,
+                            "RECONNECTED",
+                            "INFO",
+                            "Device Reconnected",
+                            devName + " has reconnected to the network.",
+                            "PARENT"
+                    );
+                }
             }
         }
 
