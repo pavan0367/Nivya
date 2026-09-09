@@ -1,0 +1,54 @@
+# ==============================================================================
+# Nivya Platform - Development Docker Compose Override Configuration
+# ==============================================================================
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# Key Features for Local Development:
+#   - Exposes MySQL on 127.0.0.1:3306 for IDEs (IntelliJ, VS Code, DBeaver)
+#   - Exposes Redis on 127.0.0.1:6379 for redis-cli and GUI inspection tools
+#   - Exposes Backend on 127.0.0.1:8080 for direct REST API & Swagger debugging
+#   - Exposes Frontend on 127.0.0.1:3000
+#   - Provides safe fallback development defaults for rapid local startup
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # MySQL - Expose loopback port for local developer tooling
+  # ----------------------------------------------------------------------------
+  mysql:
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-nivya_root_super_secret_dev_pass_2026}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-nivya_db}
+      MYSQL_USER: ${MYSQL_USER:-nivya_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-nivya_secure_dev_password_2026}
+    ports:
+      - "127.0.0.1:3306:3306"
+
+  # ----------------------------------------------------------------------------
+  # Redis - Expose loopback port for redis-cli inspection
+  # ----------------------------------------------------------------------------
+  redis:
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--requirepass", "${REDIS_PASSWORD:-nivya_redis_secure_dev_password}"]
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  # ----------------------------------------------------------------------------
+  # Spring Boot Backend - Dev profile with debug ports & relaxed CORS
+  # ----------------------------------------------------------------------------
+  backend:
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-nivya_secure_dev_password_2026}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-nivya_redis_secure_dev_password}
+      JWT_SECRET: ${JWT_SECRET:-4e6976796153656375726546616d696c795361666574794b6579323032363132}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://localhost:80}
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  # ----------------------------------------------------------------------------
+  # React Frontend - Expose port 3000 for direct browser access
+  # ----------------------------------------------------------------------------
+  frontend:
+    ports:
+      - "127.0.0.1:3000:80"

@@ -1,0 +1,2 @@
+# Directory for SSL/TLS certificates (e.g. fullchain.pem, privkey.pem)
+# In production, mount Let's Encrypt or your custom certificates here.
