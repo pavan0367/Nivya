@@ -52,8 +52,10 @@ public class LocationController {
             @PathVariable Long deviceId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant startTime,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant endTime,
+            @RequestParam(defaultValue = "0") Integer page,
+            @RequestParam(defaultValue = "100") Integer limit,
             @AuthenticationPrincipal UserPrincipal principal) {
-        LocationHistoryResponse response = locationService.getLocationHistory(deviceId, startTime, endTime, principal);
+        LocationHistoryResponse response = locationService.getLocationHistory(deviceId, startTime, endTime, page, limit, principal);
         return ResponseEntity.ok(ApiResponse.success(response, "Location history retrieved successfully"));
     }
 

@@ -64,10 +64,10 @@ com.nivya
 ├── device/         # Device registration, sessions, heartbeats, status
 ├── battery/        # Battery state ingestion, historical trends
 ├── network/        # Network telemetry, Wi-Fi/cellular state, signal quality
-├── location/       # Geolocation ingestion, reverse geocoding, history
+├── location/       # Geolocation ingestion, reverse geocoding, paginated history
 ├── usage/          # Android UsageStats sync, daily/weekly aggregation
 ├── activity/       # Broad status-level live app activity events
-├── history/        # Chronological audit timeline (Parent-only)
+├── history/        # Chronological audit timeline (Parent-only, paginated)
 ├── communication/  # High-level call metadata (duration, count)
 ├── alerts/         # Alert engine, threshold evaluation, rules
 ├── notification/   # FCM push notification dispatcher
@@ -78,7 +78,7 @@ com.nivya
 ├── safezone/       # Geofencing safe zones and entry/exit triggers
 ├── websocket/      # STOMP broker, session interceptors, Redis bridge
 ├── security/       # JWT token provider, security filters, RBAC guards
-└── common/         # Global exception handlers, DTOs, utilities
+└── common/         # Global exception handlers, DTOs, AppConfig, Health
 ```
 
 ---
@@ -111,6 +111,7 @@ graph TD
         LS[Location Callback Services]
         US[UsageStats Manager Client]
         NLS[NotificationListener Service]
+        FCM_SVC[NivyaFirebaseMessagingService]
     end
 
     UI --> VM
@@ -124,6 +125,7 @@ graph TD
     LS --> REP
     US --> REP
     NLS --> REP
+    FCM_SVC --> REP
 ```
 
 ---
@@ -148,12 +150,12 @@ sequenceDiagram
     participant WS as WebSocket STOMP Broker
     participant ParentWeb as Parent Web Dashboard
 
-    Child->>API: POST /api/v1/devices/{id}/telemetry
-    API->>API: Persist Current State & Raw Event
+    Child->>API: POST /api/v1/battery/telemetry
+    API->>API: Persist Current State & History
     API->>Redis: PUBLISH family.{familyId}.events {BATTERY_UPDATED}
     Redis->>WS: Broadcast to active nodes
-    WS->>ParentWeb: STOMP MESSAGE /topic/family.{familyId}
-    ParentWeb->>ParentWeb: Update Redux store & UI instantly without reload
+    WS->>ParentWeb: STOMP MESSAGE /topic/battery/{deviceId}
+    ParentWeb->>ParentWeb: Update state & UI instantly without reload
 ```
 
 ---
@@ -164,4 +166,15 @@ Convocation operates under a zero-coupling policy:
 - **No dependencies**: Never imports or calls Battery, Network, Location, or Usage services.
 - **Dedicated tables**: `convocation_messages` and `convocation_views`.
 - **Authoritative Server Timer**: The 2-minute visibility window is calculated on the server (`visibility_expires_at = view_started_at + 120s`).
+- **1-Hour Absolute Expiration**: Server marks messages invisible to Child after 1 hour (`child_visibility_expires_at`).
 - **Generic Notification**: Outgoing push to Child always has payload text: `"Check your battery status"`.
+- **Child Sent Messages**: Disappear from Child view upon transmission; retained permanently in Parent history.
+
+---
+
+## 7. Monitoring, Remote Config & Observability
+
+- **Remote Configuration**: Managed dynamically via `/api/v1/app/config`, controlling minimum client version enforcement, dynamic feature toggles, and sync intervals without requiring app store updates.
+- **Metrics & Tracing**: Spring Boot Actuator endpoints (`/actuator/health`, `/actuator/metrics`, `/actuator/prometheus`) provide production metrics.
+- **Structured Logging**: Container log driver `json-file` with size-capped log rotation (50MB / 5 files).
+- **Client Monitoring**: Decoupled `AppMonitoring` interface in Android core handles non-fatal errors, diagnostic breadcrumbs, and user-role tags compatible with Crashlytics and Sentry.

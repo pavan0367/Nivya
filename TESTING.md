@@ -40,7 +40,7 @@ Navigate to the `backend/` directory:
 cd backend
 ```
 
-- **Run all automated tests (115 tests)**:
+- **Run all automated tests (117 tests)**:
   ```bash
   mvn test
   ```

@@ -202,6 +202,11 @@ public class LocationService {
 
     @Transactional(readOnly = true)
     public LocationHistoryResponse getLocationHistory(Long deviceId, Instant startTime, Instant endTime, UserPrincipal principal) {
+        return getLocationHistory(deviceId, startTime, endTime, 0, 100, principal);
+    }
+
+    @Transactional(readOnly = true)
+    public LocationHistoryResponse getLocationHistory(Long deviceId, Instant startTime, Instant endTime, Integer page, Integer limit, UserPrincipal principal) {
         Device device = deviceRepository.findById(deviceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Device not found with ID: " + deviceId));
 
@@ -222,10 +227,14 @@ public class LocationService {
         Instant start = startTime != null ? startTime : Instant.now().minus(Duration.ofHours(24));
         Instant end = endTime != null ? endTime : Instant.now();
 
-        List<LocationHistory> historyList = locationHistoryRepository
-                .findByDeviceIdAndRecordedAtBetweenOrderByRecordedAtAsc(deviceId, start, end);
+        int safePage = (page != null && page >= 0) ? page : 0;
+        int safeLimit = (limit != null && limit > 0) ? Math.min(limit, 500) : 100;
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(safePage, safeLimit);
 
-        List<LocationPointDto> pointDtos = historyList.stream()
+        org.springframework.data.domain.Page<LocationHistory> historyPage = locationHistoryRepository
+                .findByDeviceIdAndRecordedAtBetweenOrderByRecordedAtAsc(deviceId, start, end, pageable);
+
+        List<LocationPointDto> pointDtos = historyPage.getContent().stream()
                 .map(h -> new LocationPointDto(
                         h.getLatitude(),
                         h.getLongitude(),
@@ -240,7 +249,7 @@ public class LocationService {
                 deviceId,
                 device.getDeviceUuid(),
                 pointDtos,
-                pointDtos.size(),
+                (int) historyPage.getTotalElements(),
                 true,
                 "Location history retrieved successfully."
         );

@@ -358,11 +358,6 @@ public class RealtimeCommunicationIntegrationTest {
         });
     }
 
-    @org.junit.jupiter.api.AfterEach
-    void tearDown() {
-        cleanDatabases();
-    }
-
     private void cleanDatabases() {
         locationHistoryRepository.deleteAll();
         locationStatusRepository.deleteAll();

@@ -1,6 +1,8 @@
 package com.nivya.location.repository;
 
 import com.nivya.location.entity.LocationHistory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -17,6 +19,9 @@ public interface LocationHistoryRepository extends JpaRepository<LocationHistory
 
     List<LocationHistory> findByDeviceIdAndRecordedAtBetweenOrderByRecordedAtAsc(
             Long deviceId, Instant startTime, Instant endTime);
+
+    Page<LocationHistory> findByDeviceIdAndRecordedAtBetweenOrderByRecordedAtAsc(
+            Long deviceId, Instant startTime, Instant endTime, Pageable pageable);
 
     List<LocationHistory> findTop50ByDeviceIdOrderByRecordedAtDesc(Long deviceId);
 

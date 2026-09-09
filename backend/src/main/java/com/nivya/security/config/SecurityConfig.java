@@ -83,8 +83,8 @@ public class SecurityConfig {
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Public liveness & readiness endpoints
-                        .requestMatchers("/api/v1/health", "/api/v1/ping").permitAll()
+                        // Public liveness, readiness, and remote config endpoints
+                        .requestMatchers("/api/v1/health", "/api/v1/ping", "/api/v1/app/config", "/api/v1/config").permitAll()
                         // Public Auth endpoints (registration, login, refresh)
                         .requestMatchers(
                                 "/api/v1/auth/register",
