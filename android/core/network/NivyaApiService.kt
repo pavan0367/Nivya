@@ -200,6 +200,33 @@ interface NivyaApiService {
     suspend fun getLiveActivity(
         @retrofit2.http.Path("deviceId") deviceId: Long
     ): Response<ApiResponseDto<LiveActivityResponseDto>>
+
+    // --- Parent-only History (Paginated, filtered, event detail) ---
+    @GET("api/v1/history/{deviceId}")
+    suspend fun getHistory(
+        @retrofit2.http.Path("deviceId") deviceId: Long,
+        @retrofit2.http.Query("page") page: Int = 0,
+        @retrofit2.http.Query("size") size: Int = 20,
+        @retrofit2.http.Query("startDate") startDate: String? = null,
+        @retrofit2.http.Query("endDate") endDate: String? = null,
+        @retrofit2.http.Query("application") application: String? = null
+    ): Response<ApiResponseDto<HistoryPageResponseDto>>
+
+    @GET("api/v1/history/{deviceId}/events/{eventId}")
+    suspend fun getHistoryEventDetail(
+        @retrofit2.http.Path("deviceId") deviceId: Long,
+        @retrofit2.http.Path("eventId") eventId: Long
+    ): Response<ApiResponseDto<HistoryEventDetailDto>>
+
+    @GET("api/v1/history/{deviceId}/applications")
+    suspend fun getHistoryApplications(
+        @retrofit2.http.Path("deviceId") deviceId: Long
+    ): Response<ApiResponseDto<List<String>>>
+
+    @POST("api/v1/history/events")
+    suspend fun sendHistoryEvent(
+        @Body request: RecordHistoryRequestDto
+    ): Response<ApiResponseDto<HistoryEventDto>>
 }
 
 

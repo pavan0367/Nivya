@@ -124,6 +124,9 @@ class LiveActivityIntegrationTest {
     @Autowired
     private ConsentRepository consentRepository;
 
+    @Autowired
+    private com.nivya.history.repository.HistoryEventRepository historyEventRepository;
+
 
 
     private User parentUser;
@@ -197,6 +200,7 @@ class LiveActivityIntegrationTest {
         batteryStatusRepository.deleteAll();
         alertRepository.deleteAll();
         activityEventRepository.deleteAll();
+        historyEventRepository.deleteAll();
         deviceStatusRepository.deleteAll();
         deviceRepository.deleteAll();
         consentRepository.deleteAll();

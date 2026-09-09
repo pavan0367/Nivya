@@ -107,6 +107,9 @@ class UsageIntegrationTest {
     @Autowired
     private com.nivya.activity.repository.ActivityEventRepository activityEventRepository;
 
+    @Autowired
+    private com.nivya.history.repository.HistoryEventRepository historyEventRepository;
+
     private User parentUser;
     private User childUser;
     private Family family;
@@ -129,6 +132,7 @@ class UsageIntegrationTest {
         alertRuleRepository.deleteAll();
         alertRepository.deleteAll();
         activityEventRepository.deleteAll();
+        historyEventRepository.deleteAll();
         deviceStatusRepository.deleteAll();
         deviceRepository.deleteAll();
         consentRepository.deleteAll();

@@ -108,6 +108,9 @@ class LocationIntegrationTest {
     private com.nivya.activity.repository.ActivityEventRepository activityEventRepository;
 
     @Autowired
+    private com.nivya.history.repository.HistoryEventRepository historyEventRepository;
+
+    @Autowired
     private com.nivya.auth.repository.RefreshTokenRepository refreshTokenRepository;
 
     private User parentUser;
@@ -131,6 +134,7 @@ class LocationIntegrationTest {
         alertRuleRepository.deleteAll();
         alertRepository.deleteAll();
         activityEventRepository.deleteAll();
+        historyEventRepository.deleteAll();
         deviceStatusRepository.deleteAll();
         deviceRepository.deleteAll();
         consentRepository.deleteAll();

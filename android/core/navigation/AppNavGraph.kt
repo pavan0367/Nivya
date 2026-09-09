@@ -259,7 +259,10 @@ fun AppNavGraph(
                     ParentLiveActivityScreen(viewModel = liveActivityViewModel)
                 }
                 composable(route = NavigationDestination.ParentHistory.route) {
-                    ParentHistoryScreen()
+                    val historyViewModel: ParentHistoryViewModel = viewModel(
+                        factory = ParentHistoryViewModel.provideFactory(appContainer.historyRepository)
+                    )
+                    ParentHistoryScreen(viewModel = historyViewModel)
                 }
                 composable(route = NavigationDestination.ParentAppUsage.route) {
                     val usageViewModel: ParentAppUsageViewModel = viewModel(

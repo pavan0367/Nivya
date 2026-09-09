@@ -44,6 +44,7 @@ interface AppContainer {
     val cleanUpRepository: CleanUpRepository
     val alertRepository: com.nivya.data.repository.AlertRepository
     val liveActivityRepository: com.nivya.data.repository.LiveActivityRepository
+    val historyRepository: com.nivya.data.repository.HistoryRepository
 }
 
 
@@ -142,6 +143,10 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
 
     override val liveActivityRepository: com.nivya.data.repository.LiveActivityRepository by lazy {
         com.nivya.data.repository.LiveActivityRepository(apiService, database.activityDao())
+    }
+
+    override val historyRepository: com.nivya.data.repository.HistoryRepository by lazy {
+        com.nivya.data.repository.HistoryRepository(apiService, database.historyDao())
     }
 }
 
