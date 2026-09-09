@@ -16,6 +16,7 @@ import com.nivya.network.entity.NetworkHistory;
 import com.nivya.network.entity.NetworkStatus;
 import com.nivya.network.repository.NetworkHistoryRepository;
 import com.nivya.network.repository.NetworkStatusRepository;
+import com.nivya.security.authorization.DeviceAccessValidator;
 import com.nivya.security.UserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +43,7 @@ public class NetworkService {
     private final AlertService alertService;
     private final SimpMessagingTemplate messagingTemplate;
     private final com.nivya.websocket.service.RealtimeBroadcastService realtimeBroadcastService;
+    private final DeviceAccessValidator deviceAccessValidator;
 
     public NetworkService(NetworkStatusRepository networkStatusRepository,
                           NetworkHistoryRepository networkHistoryRepository,
@@ -50,7 +52,8 @@ public class NetworkService {
                           FamilyMemberRepository familyMemberRepository,
                           AlertService alertService,
                           SimpMessagingTemplate messagingTemplate,
-                          com.nivya.websocket.service.RealtimeBroadcastService realtimeBroadcastService) {
+                          com.nivya.websocket.service.RealtimeBroadcastService realtimeBroadcastService,
+                          DeviceAccessValidator deviceAccessValidator) {
         this.networkStatusRepository = networkStatusRepository;
         this.networkHistoryRepository = networkHistoryRepository;
         this.deviceRepository = deviceRepository;
@@ -59,6 +62,7 @@ public class NetworkService {
         this.alertService = alertService;
         this.messagingTemplate = messagingTemplate;
         this.realtimeBroadcastService = realtimeBroadcastService;
+        this.deviceAccessValidator = deviceAccessValidator;
     }
 
     @Transactional
@@ -219,13 +223,7 @@ public class NetworkService {
 
     private void validateDeviceAccess(Device device, UserPrincipal principal) {
         if (principal == null) return;
-        boolean isOwner = device.getUser().getId().equals(principal.getId());
-        boolean isFamilyMember = device.getFamily() != null &&
-                familyMemberRepository.findByFamilyIdAndUserId(device.getFamily().getId(), principal.getId()).isPresent();
-
-        if (!isOwner && !isFamilyMember) {
-            throw new AccessDeniedException("Unauthorized access to device network telemetry.");
-        }
+        deviceAccessValidator.validateDeviceAccess(device, principal);
     }
 
     private NetworkStatusResponse toResponse(NetworkStatus status) {

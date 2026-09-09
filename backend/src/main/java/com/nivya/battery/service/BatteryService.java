@@ -13,6 +13,7 @@ import com.nivya.device.entity.DeviceStatus;
 import com.nivya.device.repository.DeviceRepository;
 import com.nivya.device.repository.DeviceStatusRepository;
 import com.nivya.family.repository.FamilyMemberRepository;
+import com.nivya.security.authorization.DeviceAccessValidator;
 import com.nivya.security.UserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +41,7 @@ public class BatteryService {
     private final FamilyMemberRepository familyMemberRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final com.nivya.websocket.service.RealtimeBroadcastService realtimeBroadcastService;
+    private final DeviceAccessValidator deviceAccessValidator;
 
     public BatteryService(BatteryStatusRepository batteryStatusRepository,
                           BatteryHistoryRepository batteryHistoryRepository,
@@ -48,7 +50,8 @@ public class BatteryService {
                           AlertService alertService,
                           FamilyMemberRepository familyMemberRepository,
                           SimpMessagingTemplate messagingTemplate,
-                          com.nivya.websocket.service.RealtimeBroadcastService realtimeBroadcastService) {
+                          com.nivya.websocket.service.RealtimeBroadcastService realtimeBroadcastService,
+                          DeviceAccessValidator deviceAccessValidator) {
         this.batteryStatusRepository = batteryStatusRepository;
         this.batteryHistoryRepository = batteryHistoryRepository;
         this.deviceRepository = deviceRepository;
@@ -57,6 +60,7 @@ public class BatteryService {
         this.familyMemberRepository = familyMemberRepository;
         this.messagingTemplate = messagingTemplate;
         this.realtimeBroadcastService = realtimeBroadcastService;
+        this.deviceAccessValidator = deviceAccessValidator;
     }
 
     @Transactional
@@ -230,13 +234,7 @@ public class BatteryService {
 
     private void validateDeviceAccess(Device device, UserPrincipal principal) {
         if (principal == null) return;
-        boolean isOwner = device.getUser() != null && device.getUser().getId().equals(principal.getId());
-        boolean isFamilyMember = device.getFamily() != null &&
-                familyMemberRepository.findByFamilyIdAndUserId(device.getFamily().getId(), principal.getId()).isPresent();
-
-        if (!isOwner && !isFamilyMember) {
-            throw new SecurityException("Unauthorized: user does not have permission to access device " + device.getId());
-        }
+        deviceAccessValidator.validateDeviceAccess(device, principal);
     }
 
     private BatteryStatusResponse mapToResponse(BatteryStatus status) {

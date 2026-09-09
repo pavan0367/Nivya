@@ -1,5 +1,6 @@
 package com.nivya.auth.service;
 
+import com.nivya.audit.service.AuditService;
 import com.nivya.auth.dto.*;
 import com.nivya.auth.entity.RefreshToken;
 import com.nivya.auth.exception.DuplicateEmailException;
@@ -22,7 +23,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Authentication Service handling registration, login, token rotation, and logout.
+ * Authentication Service handling registration, login, token rotation, audit logging,
+ * and rate-limiting brute-force protection.
  */
 @Service
 public class AuthService {
@@ -33,6 +35,8 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
+    private final AuthRateLimiter authRateLimiter;
+    private final AuditService auditService;
     private final long refreshTokenExpirationMs;
 
     public AuthService(
@@ -40,19 +44,29 @@ public class AuthService {
             RefreshTokenRepository refreshTokenRepository,
             PasswordEncoder passwordEncoder,
             JwtTokenProvider tokenProvider,
+            AuthRateLimiter authRateLimiter,
+            AuditService auditService,
             @Value("${nivya.jwt.refresh-token-expiration-ms:604800000}") long refreshTokenExpirationMs) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenProvider = tokenProvider;
+        this.authRateLimiter = authRateLimiter;
+        this.auditService = auditService;
         this.refreshTokenExpirationMs = refreshTokenExpirationMs;
     }
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
+        return register(request, "127.0.0.1");
+    }
+
+    @Transactional
+    public AuthResponse register(RegisterRequest request, String ipAddress) {
         String normalizedEmail = request.getEmail().toLowerCase().trim();
 
         if (userRepository.existsByEmail(normalizedEmail)) {
+            auditService.logEvent(null, "AUTH_REGISTER_FAILED", "Duplicate email attempt: " + normalizedEmail, ipAddress);
             throw new DuplicateEmailException(normalizedEmail);
         }
 
@@ -62,6 +76,7 @@ public class AuthService {
         user = userRepository.save(user);
 
         log.info("Registered new user with ID: {}, role: {}", user.getId(), user.getRole());
+        auditService.logEvent(user.getId(), "AUTH_REGISTER_SUCCESS", "Registered new user with role " + user.getRole(), ipAddress);
 
         UserPrincipal principal = UserPrincipal.create(user);
         String accessToken = tokenProvider.generateAccessToken(principal);
@@ -77,22 +92,37 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
+        return login(request, "127.0.0.1");
+    }
+
+    @Transactional
+    public AuthResponse login(LoginRequest request, String ipAddress) {
         String normalizedEmail = request.getEmail().toLowerCase().trim();
 
-        User user = userRepository.findByEmail(normalizedEmail)
-                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+        // 1. Rate-limiting check against brute-force attacks
+        authRateLimiter.checkRateLimit(ipAddress, normalizedEmail);
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+        // 2. Validate user and credentials
+        User user = userRepository.findByEmail(normalizedEmail).orElse(null);
+
+        if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             log.warn("Failed authentication attempt for email: {}", normalizedEmail);
+            authRateLimiter.recordFailedAttempt(ipAddress, normalizedEmail);
+            auditService.logEvent(null, "AUTH_LOGIN_FAILED", "Invalid credentials for " + normalizedEmail, ipAddress);
             throw new BadCredentialsException("Invalid email or password");
         }
 
         if (user.getStatus() != UserStatus.ACTIVE) {
+            auditService.logEvent(user.getId(), "AUTH_LOGIN_BLOCKED", "Inactive account login attempt", ipAddress);
             throw new IllegalStateException("Account is not active (status: " + user.getStatus() + ")");
         }
 
+        // 3. Reset rate limiter and log success
+        authRateLimiter.recordSuccess(ipAddress, normalizedEmail);
         user.setLastLoginAt(Instant.now());
         userRepository.save(user);
+
+        auditService.logEvent(user.getId(), "AUTH_LOGIN_SUCCESS", "Login successful with role " + user.getRole(), ipAddress);
 
         UserPrincipal principal = UserPrincipal.create(user);
         String accessToken = tokenProvider.generateAccessToken(principal);
@@ -108,13 +138,20 @@ public class AuthService {
         );
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = InvalidTokenException.class)
     public AuthResponse refreshToken(RefreshTokenRequest request) {
+        return refreshToken(request, "127.0.0.1");
+    }
+
+    @Transactional(noRollbackFor = InvalidTokenException.class)
+    public AuthResponse refreshToken(RefreshTokenRequest request, String ipAddress) {
         RefreshToken token = refreshTokenRepository.findByTokenHash(request.getRefreshToken())
                 .orElseThrow(() -> new InvalidTokenException("Refresh token is invalid or non-existent"));
 
         if (token.isRevoked()) {
             log.warn("Attempted reuse of revoked refresh token for user ID: {}", token.getUser().getId());
+            auditService.logEvent(token.getUser().getId(), "TOKEN_REUSE_DETECTED",
+                    "Attempted reuse of revoked refresh token; all active tokens invalidated", ipAddress);
             // Potential token reuse attack: revoke all tokens for this user
             refreshTokenRepository.revokeAllUserTokens(token.getUser().getId(), Instant.now());
             throw new InvalidTokenException("Refresh token was previously revoked. Please re-authenticate.");
@@ -123,6 +160,7 @@ public class AuthService {
         if (token.isExpired()) {
             token.revoke();
             refreshTokenRepository.save(token);
+            auditService.logEvent(token.getUser().getId(), "TOKEN_EXPIRED", "Expired refresh token submitted", ipAddress);
             throw new InvalidTokenException("Refresh token has expired. Please log in again.");
         }
 
@@ -135,6 +173,8 @@ public class AuthService {
         UserPrincipal principal = UserPrincipal.create(user);
         String newAccessToken = tokenProvider.generateAccessToken(principal);
 
+        auditService.logEvent(user.getId(), "TOKEN_ROTATED", "Successfully rotated refresh token", ipAddress);
+
         return new AuthResponse(
                 newAccessToken,
                 newRefreshTokenString,
@@ -145,6 +185,11 @@ public class AuthService {
 
     @Transactional
     public void logout(String refreshTokenString, UserPrincipal principal) {
+        logout(refreshTokenString, principal, "127.0.0.1");
+    }
+
+    @Transactional
+    public void logout(String refreshTokenString, UserPrincipal principal, String ipAddress) {
         if (refreshTokenString != null && !refreshTokenString.isBlank()) {
             refreshTokenRepository.findByTokenHash(refreshTokenString)
                     .ifPresent(token -> {
@@ -154,6 +199,9 @@ public class AuthService {
         } else if (principal != null) {
             refreshTokenRepository.revokeAllUserTokens(principal.getId(), Instant.now());
         }
+
+        Long userId = principal != null ? principal.getId() : null;
+        auditService.logEvent(userId, "AUTH_LOGOUT", "User logged out", ipAddress);
     }
 
     @Transactional(readOnly = true)

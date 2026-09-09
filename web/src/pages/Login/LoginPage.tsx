@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Lock, Mail, ArrowRight, UserCheck, AlertCircle } from 'lucide-react';
+import { Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 import { authService } from '../../services/authService';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [email, setEmail] = useState('parent@nivya.local');
-  const [password, setPassword] = useState('Password123!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,18 +39,6 @@ export const LoginPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleFillDemoParent = () => {
-    setEmail('parent@nivya.local');
-    setPassword('Password123!');
-    setError(null);
-  };
-
-  const handleFillDemoChild = () => {
-    setEmail('child@nivya.local');
-    setPassword('Password123!');
-    setError(null);
   };
 
   return (
@@ -160,42 +148,6 @@ export const LoginPage: React.FC = () => {
           )}
         </button>
       </form>
-
-      {/* Quick Role Fill Presets */}
-      <div
-        style={{
-          marginTop: '1.75rem',
-          paddingTop: '1.25rem',
-          borderTop: '1px solid var(--border-subtle)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.65rem',
-        }}
-      >
-        <span style={{ fontSize: '0.775rem', color: 'var(--text-dim)', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          Quick Demo Credentials
-        </span>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={handleFillDemoParent}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
-          >
-            <UserCheck size={14} color="var(--primary)" />
-            Parent Demo
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={handleFillDemoChild}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
-          >
-            <UserCheck size={14} color="var(--warning)" />
-            Child Demo
-          </button>
-        </div>
-      </div>
     </div>
   );
 };

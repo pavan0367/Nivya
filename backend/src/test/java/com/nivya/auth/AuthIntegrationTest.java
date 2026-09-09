@@ -202,19 +202,19 @@ class AuthIntegrationTest {
         String newRefreshToken = refreshJsonNode.get("data").get("refreshToken").asText();
         assertNotEquals(initialRefreshToken, newRefreshToken);
 
-        // 2. Attempting to reuse the revoked initial token must fail
-        mockMvc.perform(post("/api/v1/auth/refresh")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new RefreshTokenRequest(initialRefreshToken))))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.success").value(false));
-
-        // 3. New refresh token works
+        // 2. New refresh token works (verifying successful token rotation)
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new RefreshTokenRequest(newRefreshToken))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
+
+        // 3. Attempting to reuse the revoked initial token must fail
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new RefreshTokenRequest(initialRefreshToken))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false));
     }
 
     @Test

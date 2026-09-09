@@ -14,6 +14,7 @@ import com.nivya.location.service.LocationService;
 import com.nivya.network.dto.NetworkStatusResponse;
 import com.nivya.network.service.NetworkService;
 import com.nivya.role.RoleType;
+import com.nivya.security.authorization.DeviceAccessValidator;
 import com.nivya.security.UserPrincipal;
 import com.nivya.websocket.dto.DeviceTelemetrySnapshotDto;
 import com.nivya.websocket.redis.TransientStateStore;
@@ -39,6 +40,7 @@ public class TelemetrySnapshotService {
     private final LocationService locationService;
     private final LiveActivityService liveActivityService;
     private final TransientStateStore transientStateStore;
+    private final DeviceAccessValidator deviceAccessValidator;
 
     public TelemetrySnapshotService(DeviceRepository deviceRepository,
                                     FamilyMemberRepository familyMemberRepository,
@@ -46,7 +48,8 @@ public class TelemetrySnapshotService {
                                     NetworkService networkService,
                                     LocationService locationService,
                                     LiveActivityService liveActivityService,
-                                    TransientStateStore transientStateStore) {
+                                    TransientStateStore transientStateStore,
+                                    DeviceAccessValidator deviceAccessValidator) {
         this.deviceRepository = deviceRepository;
         this.familyMemberRepository = familyMemberRepository;
         this.batteryService = batteryService;
@@ -54,6 +57,7 @@ public class TelemetrySnapshotService {
         this.locationService = locationService;
         this.liveActivityService = liveActivityService;
         this.transientStateStore = transientStateStore;
+        this.deviceAccessValidator = deviceAccessValidator;
     }
 
     public DeviceTelemetrySnapshotDto getDeviceSnapshot(Long deviceId, UserPrincipal principal) {
@@ -129,17 +133,6 @@ public class TelemetrySnapshotService {
     }
 
     private void verifyAccess(Device device, UserPrincipal principal) {
-        if (device.getUser() != null && device.getUser().getId().equals(principal.getId())) {
-            return;
-        }
-
-        if (device.getFamily() != null) {
-            boolean isFamilyMember = familyMemberRepository.existsByFamilyIdAndUserId(device.getFamily().getId(), principal.getId());
-            if (isFamilyMember) {
-                return;
-            }
-        }
-
-        throw new AccessDeniedException("Unauthorized access to device telemetry snapshot: " + device.getId());
+        deviceAccessValidator.validateDeviceAccess(device, principal);
     }
 }

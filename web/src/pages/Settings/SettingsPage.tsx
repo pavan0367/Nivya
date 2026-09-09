@@ -26,7 +26,7 @@ export const SettingsPage: React.FC = () => {
 
   const [user, setUser] = useState<User | null>(null);
   const [devices, setDevices] = useState<Device[]>([]);
-  const [pairingCode, setPairingCode] = useState<string>('NV-849201');
+  const [pairingCode, setPairingCode] = useState<string>('Click "Generate"');
 
   // Notification settings toggle state
   const [notifyLowBattery, setNotifyLowBattery] = useState<boolean>(true);

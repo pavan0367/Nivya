@@ -4,6 +4,7 @@ import com.nivya.common.exception.ResourceNotFoundException;
 import com.nivya.device.entity.Device;
 import com.nivya.device.repository.DeviceRepository;
 import com.nivya.family.repository.FamilyMemberRepository;
+import com.nivya.security.authorization.DeviceAccessValidator;
 import com.nivya.security.UserPrincipal;
 import com.nivya.usage.dto.AppUsageResponse;
 import com.nivya.usage.dto.UsageSummaryResponse;
@@ -33,15 +34,18 @@ public class UsageService {
     private final UsageAppRepository usageAppRepository;
     private final DeviceRepository deviceRepository;
     private final FamilyMemberRepository familyMemberRepository;
+    private final DeviceAccessValidator deviceAccessValidator;
 
     public UsageService(UsageSummaryRepository usageSummaryRepository,
                         UsageAppRepository usageAppRepository,
                         DeviceRepository deviceRepository,
-                        FamilyMemberRepository familyMemberRepository) {
+                        FamilyMemberRepository familyMemberRepository,
+                        DeviceAccessValidator deviceAccessValidator) {
         this.usageSummaryRepository = usageSummaryRepository;
         this.usageAppRepository = usageAppRepository;
         this.deviceRepository = deviceRepository;
         this.familyMemberRepository = familyMemberRepository;
+        this.deviceAccessValidator = deviceAccessValidator;
     }
 
     @Transactional
@@ -226,13 +230,7 @@ public class UsageService {
 
     private void validateDeviceAccess(Device device, UserPrincipal principal) {
         if (principal == null) return;
-        boolean isOwner = device.getUser().getId().equals(principal.getId());
-        boolean isFamilyMember = device.getFamily() != null &&
-                familyMemberRepository.findByFamilyIdAndUserId(device.getFamily().getId(), principal.getId()).isPresent();
-
-        if (!isOwner && !isFamilyMember) {
-            throw new AccessDeniedException("Unauthorized access to device usage statistics.");
-        }
+        deviceAccessValidator.validateDeviceAccess(device, principal);
     }
 
     private String formatDuration(long totalSeconds) {

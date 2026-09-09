@@ -4,6 +4,7 @@ import com.nivya.device.entity.Device;
 import com.nivya.device.repository.DeviceRepository;
 import com.nivya.family.repository.FamilyMemberRepository;
 import com.nivya.role.RoleType;
+import com.nivya.security.authorization.DeviceAccessValidator;
 import com.nivya.security.UserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,11 +31,14 @@ public class WebSocketAuthorizationService {
 
     private final DeviceRepository deviceRepository;
     private final FamilyMemberRepository familyMemberRepository;
+    private final DeviceAccessValidator deviceAccessValidator;
 
     public WebSocketAuthorizationService(DeviceRepository deviceRepository,
-                                         FamilyMemberRepository familyMemberRepository) {
+                                         FamilyMemberRepository familyMemberRepository,
+                                         DeviceAccessValidator deviceAccessValidator) {
         this.deviceRepository = deviceRepository;
         this.familyMemberRepository = familyMemberRepository;
+        this.deviceAccessValidator = deviceAccessValidator;
     }
 
     /**
@@ -102,29 +106,9 @@ public class WebSocketAuthorizationService {
     }
 
     private void verifyDeviceAccess(UserPrincipal principal, Long deviceId, String destination) {
-        Optional<Device> deviceOpt = deviceRepository.findById(deviceId);
-        if (deviceOpt.isEmpty()) {
-            log.warn("Subscription denied: Device [{}] not found for destination [{}]", deviceId, destination);
-            throw new AccessDeniedException("Device not found: " + deviceId);
-        }
+        Device device = deviceRepository.findById(deviceId)
+                .orElseThrow(() -> new AccessDeniedException("Device not found: " + deviceId));
 
-        Device device = deviceOpt.get();
-
-        // Check if user owns the device
-        if (device.getUser() != null && device.getUser().getId().equals(principal.getId())) {
-            return;
-        }
-
-        // Check if user belongs to the same family as the device
-        if (device.getFamily() != null) {
-            boolean isFamilyMember = familyMemberRepository.existsByFamilyIdAndUserId(device.getFamily().getId(), principal.getId());
-            if (isFamilyMember) {
-                return;
-            }
-        }
-
-        log.warn("Access denied: User [{}] does not own and is not in the family of device [{}]",
-                principal.getId(), deviceId);
-        throw new AccessDeniedException("Unauthorized access to device " + deviceId);
+        deviceAccessValidator.validateDeviceAccess(device, principal);
     }
 }

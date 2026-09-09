@@ -6,6 +6,7 @@ import com.nivya.common.response.ApiResponse;
 import com.nivya.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,8 +29,9 @@ public class AuthController {
 
     @Operation(summary = "Register New Account", description = "Registers a new Parent or Child account and issues initial tokens")
     @PostMapping("/register")
-    public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request) {
-        AuthResponse response = authService.register(request);
+    public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request,
+                                                              HttpServletRequest httpRequest) {
+        AuthResponse response = authService.register(request, getClientIp(httpRequest));
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response, "User registered successfully"));
@@ -37,15 +39,17 @@ public class AuthController {
 
     @Operation(summary = "User Login", description = "Authenticates user credentials and returns JWT access + refresh tokens")
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
-        AuthResponse response = authService.login(request);
+    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request,
+                                                           HttpServletRequest httpRequest) {
+        AuthResponse response = authService.login(request, getClientIp(httpRequest));
         return ResponseEntity.ok(ApiResponse.success(response, "Login successful"));
     }
 
     @Operation(summary = "Refresh Access Token", description = "Exchanges a valid refresh token for rotated tokens")
     @PostMapping("/refresh")
-    public ResponseEntity<ApiResponse<AuthResponse>> refresh(@Valid @RequestBody RefreshTokenRequest request) {
-        AuthResponse response = authService.refreshToken(request);
+    public ResponseEntity<ApiResponse<AuthResponse>> refresh(@Valid @RequestBody RefreshTokenRequest request,
+                                                            HttpServletRequest httpRequest) {
+        AuthResponse response = authService.refreshToken(request, getClientIp(httpRequest));
         return ResponseEntity.ok(ApiResponse.success(response, "Token refreshed successfully"));
     }
 
@@ -53,9 +57,10 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(
             @RequestBody(required = false) RefreshTokenRequest request,
-            @AuthenticationPrincipal UserPrincipal principal) {
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest httpRequest) {
         String tokenString = request != null ? request.getRefreshToken() : null;
-        authService.logout(tokenString, principal);
+        authService.logout(tokenString, principal, getClientIp(httpRequest));
         return ResponseEntity.ok(ApiResponse.success(null, "Logged out successfully"));
     }
 
@@ -64,5 +69,14 @@ public class AuthController {
     public ResponseEntity<ApiResponse<UserSummaryDto>> getCurrentUser(@AuthenticationPrincipal UserPrincipal principal) {
         UserSummaryDto userDto = authService.getCurrentUser(principal);
         return ResponseEntity.ok(ApiResponse.success(userDto, "User context retrieved"));
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        if (request == null) return "127.0.0.1";
+        String xfHeader = request.getHeader("X-Forwarded-For");
+        if (xfHeader == null || xfHeader.isBlank()) {
+            return request.getRemoteAddr() != null ? request.getRemoteAddr() : "127.0.0.1";
+        }
+        return xfHeader.split(",")[0].trim();
     }
 }

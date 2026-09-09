@@ -95,7 +95,19 @@ public class GlobalExceptionHandler {
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.FORBIDDEN.value(),
                 HttpStatus.FORBIDDEN.getReasonPhrase(),
-                "You do not have permission to perform this action",
+                ex.getMessage() != null && !ex.getMessage().isBlank() ? ex.getMessage() : "You do not have permission to perform this action",
+                request.getRequestURI()
+        );
+        return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
+    }
+
+    @ExceptionHandler(SecurityException.class)
+    public ResponseEntity<ErrorResponse> handleSecurityException(SecurityException ex, HttpServletRequest request) {
+        log.warn("Security violation on URI {}: {}", request.getRequestURI(), ex.getMessage());
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.FORBIDDEN.value(),
+                HttpStatus.FORBIDDEN.getReasonPhrase(),
+                ex.getMessage() != null && !ex.getMessage().isBlank() ? ex.getMessage() : "Access denied",
                 request.getRequestURI()
         );
         return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
@@ -113,8 +125,8 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
     }
 
-    @ExceptionHandler(com.nivya.pairing.exception.RateLimitExceededException.class)
-    public ResponseEntity<ErrorResponse> handleRateLimitExceeded(com.nivya.pairing.exception.RateLimitExceededException ex, HttpServletRequest request) {
+    @ExceptionHandler(com.nivya.common.exception.RateLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleRateLimitExceeded(com.nivya.common.exception.RateLimitExceededException ex, HttpServletRequest request) {
         log.warn("Rate limit exceeded on {}: {}", request.getRequestURI(), ex.getMessage());
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.TOO_MANY_REQUESTS.value(),

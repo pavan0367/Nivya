@@ -12,6 +12,7 @@ import com.nivya.device.repository.DeviceStatusRepository;
 import com.nivya.family.repository.FamilyMemberRepository;
 import com.nivya.security.UserPrincipal;
 import org.slf4j.Logger;
+import com.nivya.security.authorization.DeviceAccessValidator;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -32,19 +33,22 @@ public class DeviceHealthService {
     private final AlertService alertService;
     private final FamilyMemberRepository familyMemberRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final DeviceAccessValidator deviceAccessValidator;
 
     public DeviceHealthService(DeviceHealthRepository deviceHealthRepository,
                                DeviceRepository deviceRepository,
                                DeviceStatusRepository deviceStatusRepository,
                                AlertService alertService,
                                FamilyMemberRepository familyMemberRepository,
-                               SimpMessagingTemplate messagingTemplate) {
+                               SimpMessagingTemplate messagingTemplate,
+                               DeviceAccessValidator deviceAccessValidator) {
         this.deviceHealthRepository = deviceHealthRepository;
         this.deviceRepository = deviceRepository;
         this.deviceStatusRepository = deviceStatusRepository;
         this.alertService = alertService;
         this.familyMemberRepository = familyMemberRepository;
         this.messagingTemplate = messagingTemplate;
+        this.deviceAccessValidator = deviceAccessValidator;
     }
 
     @Transactional
@@ -264,13 +268,7 @@ public class DeviceHealthService {
 
     private void validateDeviceAccess(Device device, UserPrincipal principal) {
         if (principal == null) return;
-        boolean isOwner = device.getUser() != null && device.getUser().getId().equals(principal.getId());
-        boolean isFamilyMember = device.getFamily() != null &&
-                familyMemberRepository.findByFamilyIdAndUserId(device.getFamily().getId(), principal.getId()).isPresent();
-
-        if (!isOwner && !isFamilyMember) {
-            throw new AccessDeniedException("Unauthorized: user does not have permission to access device " + device.getId());
-        }
+        deviceAccessValidator.validateDeviceAccess(device, principal);
     }
 
     private DeviceHealth createDefaultHealth(Device device) {
