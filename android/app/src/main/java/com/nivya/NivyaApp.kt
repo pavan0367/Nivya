@@ -26,6 +26,7 @@ class NivyaApp : Application(), Configuration.Provider {
         UsageSyncWorker.schedulePeriodic(this)
         LocationSyncWorker.schedulePeriodic(this)
         DeviceHealthSyncWorker.schedulePeriodic(this)
+        com.nivya.services.notification.AlertNotificationManager.initChannels(this)
     }
 
 

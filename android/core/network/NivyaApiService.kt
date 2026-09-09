@@ -154,6 +154,41 @@ interface NivyaApiService {
 
     @GET("api/v1/device/health/my")
     suspend fun getMyDeviceHealth(): Response<ApiResponseDto<DeviceHealthResponseDto>>
+
+    // --- Alerts & Notifications ---
+    @GET("api/v1/alerts/family/{familyId}")
+    suspend fun getFamilyAlerts(
+        @retrofit2.http.Path("familyId") familyId: Long,
+        @retrofit2.http.Query("unreadOnly") unreadOnly: Boolean? = null,
+        @retrofit2.http.Query("severity") severity: String? = null
+    ): Response<ApiResponseDto<List<AlertDto>>>
+
+    @GET("api/v1/alerts/my")
+    suspend fun getChildAlerts(): Response<ApiResponseDto<List<AlertDto>>>
+
+    @POST("api/v1/alerts/{alertId}/read")
+    suspend fun markAlertAsRead(
+        @retrofit2.http.Path("alertId") alertId: Long
+    ): Response<ApiResponseDto<AlertDto>>
+
+    @POST("api/v1/alerts/{alertId}/resolve")
+    suspend fun resolveAlert(
+        @retrofit2.http.Path("alertId") alertId: Long
+    ): Response<ApiResponseDto<AlertDto>>
+
+    @GET("api/v1/alerts/unread-count")
+    suspend fun getUnreadAlertsCount(): Response<ApiResponseDto<UnreadCountDto>>
+
+    @GET("api/v1/alerts/rules/{familyId}")
+    suspend fun getAlertRules(
+        @retrofit2.http.Path("familyId") familyId: Long
+    ): Response<ApiResponseDto<List<AlertRuleDto>>>
+
+    @retrofit2.http.PUT("api/v1/alerts/rules/{ruleId}")
+    suspend fun updateAlertRule(
+        @retrofit2.http.Path("ruleId") ruleId: Long,
+        @Body request: UpdateAlertRuleRequestDto
+    ): Response<ApiResponseDto<AlertRuleDto>>
 }
 
 

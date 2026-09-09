@@ -43,6 +43,15 @@ public class Alert {
     @Column(name = "resolved_at")
     private Instant resolvedAt;
 
+    @Column(name = "is_read", nullable = false)
+    private boolean isRead = false;
+
+    @Column(name = "read_at")
+    private Instant readAt;
+
+    @Column(name = "target_role", nullable = false, length = 20)
+    private String targetRole = "PARENT";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -50,13 +59,19 @@ public class Alert {
     }
 
     public Alert(Family family, Device device, String alertType, String severity, String title, String message) {
+        this(family, device, alertType, severity, title, message, "PARENT");
+    }
+
+    public Alert(Family family, Device device, String alertType, String severity, String title, String message, String targetRole) {
         this.family = family;
         this.device = device;
         this.alertType = alertType;
         this.severity = severity;
         this.title = title;
         this.message = message;
+        this.targetRole = targetRole != null ? targetRole : "PARENT";
         this.resolved = false;
+        this.isRead = false;
         this.createdAt = Instant.now();
     }
 
@@ -140,6 +155,33 @@ public class Alert {
 
     public void setResolvedAt(Instant resolvedAt) {
         this.resolvedAt = resolvedAt;
+    }
+
+    public boolean isRead() {
+        return isRead;
+    }
+
+    public void setRead(boolean read) {
+        isRead = read;
+        if (read && this.readAt == null) {
+            this.readAt = Instant.now();
+        }
+    }
+
+    public Instant getReadAt() {
+        return readAt;
+    }
+
+    public void setReadAt(Instant readAt) {
+        this.readAt = readAt;
+    }
+
+    public String getTargetRole() {
+        return targetRole;
+    }
+
+    public void setTargetRole(String targetRole) {
+        this.targetRole = targetRole;
     }
 
     public Instant getCreatedAt() {

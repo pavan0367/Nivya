@@ -99,6 +99,12 @@ class LocationIntegrationTest {
     private com.nivya.alerts.repository.AlertRepository alertRepository;
 
     @Autowired
+    private com.nivya.alerts.repository.NotificationRecordRepository notificationRecordRepository;
+
+    @Autowired
+    private com.nivya.alerts.repository.AlertRuleRepository alertRuleRepository;
+
+    @Autowired
     private com.nivya.auth.repository.RefreshTokenRepository refreshTokenRepository;
 
     private User parentUser;
@@ -118,6 +124,8 @@ class LocationIntegrationTest {
         networkStatusRepository.deleteAll();
         batteryHistoryRepository.deleteAll();
         batteryStatusRepository.deleteAll();
+        notificationRecordRepository.deleteAll();
+        alertRuleRepository.deleteAll();
         alertRepository.deleteAll();
         deviceStatusRepository.deleteAll();
         deviceRepository.deleteAll();

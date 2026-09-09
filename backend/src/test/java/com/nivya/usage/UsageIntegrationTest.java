@@ -98,6 +98,12 @@ class UsageIntegrationTest {
     @Autowired
     private com.nivya.consent.repository.ConsentRepository consentRepository;
 
+    @Autowired
+    private com.nivya.alerts.repository.NotificationRecordRepository notificationRecordRepository;
+
+    @Autowired
+    private com.nivya.alerts.repository.AlertRuleRepository alertRuleRepository;
+
     private User parentUser;
     private User childUser;
     private Family family;
@@ -116,6 +122,8 @@ class UsageIntegrationTest {
         networkStatusRepository.deleteAll();
         batteryHistoryRepository.deleteAll();
         batteryStatusRepository.deleteAll();
+        notificationRecordRepository.deleteAll();
+        alertRuleRepository.deleteAll();
         alertRepository.deleteAll();
         deviceStatusRepository.deleteAll();
         deviceRepository.deleteAll();

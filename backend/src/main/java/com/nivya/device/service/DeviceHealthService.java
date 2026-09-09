@@ -1,7 +1,6 @@
 package com.nivya.device.service;
 
-import com.nivya.alerts.entity.Alert;
-import com.nivya.alerts.repository.AlertRepository;
+import com.nivya.alerts.service.AlertService;
 import com.nivya.common.exception.ResourceNotFoundException;
 import com.nivya.device.dto.*;
 import com.nivya.device.entity.Device;
@@ -30,20 +29,20 @@ public class DeviceHealthService {
     private final DeviceHealthRepository deviceHealthRepository;
     private final DeviceRepository deviceRepository;
     private final DeviceStatusRepository deviceStatusRepository;
-    private final AlertRepository alertRepository;
+    private final AlertService alertService;
     private final FamilyMemberRepository familyMemberRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
     public DeviceHealthService(DeviceHealthRepository deviceHealthRepository,
                                DeviceRepository deviceRepository,
                                DeviceStatusRepository deviceStatusRepository,
-                               AlertRepository alertRepository,
+                               AlertService alertService,
                                FamilyMemberRepository familyMemberRepository,
                                SimpMessagingTemplate messagingTemplate) {
         this.deviceHealthRepository = deviceHealthRepository;
         this.deviceRepository = deviceRepository;
         this.deviceStatusRepository = deviceStatusRepository;
-        this.alertRepository = alertRepository;
+        this.alertService = alertService;
         this.familyMemberRepository = familyMemberRepository;
         this.messagingTemplate = messagingTemplate;
     }
@@ -221,58 +220,45 @@ public class DeviceHealthService {
 
     private void handleStorageAlert(Device device, boolean isLowStorage, long freeStorage, long totalStorage) {
         if (device.getFamily() == null) return;
-        Optional<Alert> existingAlert = alertRepository.findFirstByDeviceIdAndAlertTypeAndResolvedFalse(device.getId(), "LOW_STORAGE");
-
         if (isLowStorage) {
-            if (existingAlert.isEmpty()) {
-                long freeGb = freeStorage / (1024 * 1024 * 1024);
-                Alert alert = new Alert(
-                        device.getFamily(),
-                        device,
-                        "LOW_STORAGE",
-                        freeStorage < (totalStorage * 0.05) ? "CRITICAL" : "WARNING",
-                        "Low Storage Warning",
-                        device.getDeviceName() + " is running low on storage (" + freeGb + " GB free). Consider freeing up space."
-                );
-                alertRepository.save(alert);
-            }
+            long freeGb = freeStorage / (1024 * 1024 * 1024);
+            String severity = freeStorage < (totalStorage * 0.05) ? "CRITICAL" : "WARNING";
+            String devName = device.getDeviceName() != null ? device.getDeviceName() : "Device";
+            alertService.triggerOrUpdateAlert(
+                    device.getFamily(),
+                    device,
+                    "LOW_STORAGE",
+                    severity,
+                    "Low Storage Warning",
+                    devName + " is running low on storage (" + freeGb + " GB free). Consider freeing up space.",
+                    "ALL"
+            );
         } else {
-            existingAlert.ifPresent(alert -> {
-                alert.setResolved(true);
-                alert.setResolvedAt(Instant.now());
-                alertRepository.save(alert);
-            });
+            alertService.resolveAlert(device.getId(), "LOW_STORAGE");
         }
     }
 
     private void handlePermissionAlert(Device device, boolean allHealthy, boolean locHealthy, boolean usageHealthy, boolean notifHealthy) {
         if (device.getFamily() == null) return;
-        Optional<Alert> existingAlert = alertRepository.findFirstByDeviceIdAndAlertTypeAndResolvedFalse(device.getId(), "PERMISSION_REVOKED");
-
         if (!allHealthy) {
-            if (existingAlert.isEmpty()) {
-                StringBuilder sb = new StringBuilder("Required permissions are disabled on ").append(device.getDeviceName()).append(": ");
-                if (!locHealthy) sb.append("Location, ");
-                if (!usageHealthy) sb.append("Usage Access, ");
-                if (!notifHealthy) sb.append("Notifications, ");
-                String msg = sb.substring(0, sb.length() - 2);
+            String devName = device.getDeviceName() != null ? device.getDeviceName() : "Device";
+            StringBuilder sb = new StringBuilder("Required permissions are disabled on ").append(devName).append(": ");
+            if (!locHealthy) sb.append("Location, ");
+            if (!usageHealthy) sb.append("Usage Access, ");
+            if (!notifHealthy) sb.append("Notifications, ");
+            String msg = sb.substring(0, sb.length() - 2);
 
-                Alert alert = new Alert(
-                        device.getFamily(),
-                        device,
-                        "PERMISSION_REVOKED",
-                        "WARNING",
-                        "Permission Attention Needed",
-                        msg
-                );
-                alertRepository.save(alert);
-            }
+            alertService.triggerOrUpdateAlert(
+                    device.getFamily(),
+                    device,
+                    "PERMISSION_REVOKED",
+                    "CRITICAL",
+                    "Permission Attention Needed",
+                    msg,
+                    "ALL"
+            );
         } else {
-            existingAlert.ifPresent(alert -> {
-                alert.setResolved(true);
-                alert.setResolvedAt(Instant.now());
-                alertRepository.save(alert);
-            });
+            alertService.resolveAlert(device.getId(), "PERMISSION_REVOKED");
         }
     }
 

@@ -1,7 +1,6 @@
 package com.nivya.battery.service;
 
-import com.nivya.alerts.entity.Alert;
-import com.nivya.alerts.repository.AlertRepository;
+import com.nivya.alerts.service.AlertService;
 import com.nivya.battery.dto.*;
 import com.nivya.battery.entity.BatteryHistory;
 import com.nivya.battery.entity.BatteryStatus;
@@ -37,7 +36,7 @@ public class BatteryService {
     private final BatteryHistoryRepository batteryHistoryRepository;
     private final DeviceRepository deviceRepository;
     private final DeviceStatusRepository deviceStatusRepository;
-    private final AlertRepository alertRepository;
+    private final AlertService alertService;
     private final FamilyMemberRepository familyMemberRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
@@ -45,14 +44,14 @@ public class BatteryService {
                           BatteryHistoryRepository batteryHistoryRepository,
                           DeviceRepository deviceRepository,
                           DeviceStatusRepository deviceStatusRepository,
-                          AlertRepository alertRepository,
+                          AlertService alertService,
                           FamilyMemberRepository familyMemberRepository,
                           SimpMessagingTemplate messagingTemplate) {
         this.batteryStatusRepository = batteryStatusRepository;
         this.batteryHistoryRepository = batteryHistoryRepository;
         this.deviceRepository = deviceRepository;
         this.deviceStatusRepository = deviceStatusRepository;
-        this.alertRepository = alertRepository;
+        this.alertService = alertService;
         this.familyMemberRepository = familyMemberRepository;
         this.messagingTemplate = messagingTemplate;
     }
@@ -200,26 +199,21 @@ public class BatteryService {
     }
 
     private void handleLowBatteryAlert(Device device, int pct, boolean isLowBattery) {
-        Optional<Alert> existingAlert = alertRepository.findFirstByDeviceIdAndAlertTypeAndResolvedFalse(device.getId(), "LOW_BATTERY");
-
+        if (device.getFamily() == null) return;
         if (isLowBattery) {
-            if (existingAlert.isEmpty()) {
-                Alert alert = new Alert(
-                        device.getFamily(),
-                        device,
-                        "LOW_BATTERY",
-                        pct <= 10 ? "CRITICAL" : "WARNING",
-                        "Low Battery Alert",
-                        device.getDeviceName() + " battery is low (" + pct + "%). Connect charger soon."
-                );
-                alertRepository.save(alert);
-            }
+            String severity = pct <= 5 ? "CRITICAL" : "WARNING";
+            String devName = device.getDeviceName() != null ? device.getDeviceName() : "Device";
+            alertService.triggerOrUpdateAlert(
+                    device.getFamily(),
+                    device,
+                    "LOW_BATTERY",
+                    severity,
+                    "Low Battery Alert",
+                    devName + " battery is low (" + pct + "%). Connect charger soon.",
+                    "ALL"
+            );
         } else {
-            // Resolve previous low battery alert if battery recovered
-            existingAlert.ifPresent(alert -> {
-                alert.setResolved(true);
-                alertRepository.save(alert);
-            });
+            alertService.resolveAlert(device.getId(), "LOW_BATTERY");
         }
     }
 

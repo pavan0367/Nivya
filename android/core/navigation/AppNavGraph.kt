@@ -13,7 +13,9 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.nivya.core.di.AppContainer
 import com.nivya.ui.alerts.ChildAlertsScreen
+import com.nivya.ui.alerts.ChildAlertsViewModel
 import com.nivya.ui.alerts.ParentAlertsScreen
+import com.nivya.ui.alerts.ParentAlertsViewModel
 import com.nivya.ui.auth.LoginScreen
 import com.nivya.ui.auth.LoginViewModel
 import com.nivya.ui.battery.ChildBatteryScreen
@@ -286,7 +288,10 @@ fun AppNavGraph(
                     ParentNetworkScreen(viewModel = networkViewModel)
                 }
                 composable(route = NavigationDestination.ParentAlerts.route) {
-                    ParentAlertsScreen()
+                    val alertsViewModel: ParentAlertsViewModel = viewModel(
+                        factory = ParentAlertsViewModel.provideFactory(appContainer.alertRepository)
+                    )
+                    ParentAlertsScreen(viewModel = alertsViewModel)
                 }
                 composable(route = NavigationDestination.ParentConvocation.route) {
                     ParentConvocationScreen()
@@ -347,7 +352,10 @@ fun AppNavGraph(
                     ChildCleanUpScreen(viewModel = cleanUpViewModel)
                 }
                 composable(route = NavigationDestination.ChildAlerts.route) {
-                    ChildAlertsScreen()
+                    val alertsViewModel: ChildAlertsViewModel = viewModel(
+                        factory = ChildAlertsViewModel.provideFactory(appContainer.alertRepository)
+                    )
+                    ChildAlertsScreen(viewModel = alertsViewModel)
                 }
                 composable(route = NavigationDestination.ChildConvocation.route) {
                     ChildConvocationScreen()

@@ -1,5 +1,7 @@
 package com.nivya.network.service;
 
+import com.nivya.alerts.service.AlertService;
+
 import com.nivya.common.exception.ResourceNotFoundException;
 import com.nivya.device.entity.Device;
 import com.nivya.device.entity.DeviceStatus;
@@ -37,6 +39,7 @@ public class NetworkService {
     private final DeviceRepository deviceRepository;
     private final DeviceStatusRepository deviceStatusRepository;
     private final FamilyMemberRepository familyMemberRepository;
+    private final AlertService alertService;
     private final SimpMessagingTemplate messagingTemplate;
 
     public NetworkService(NetworkStatusRepository networkStatusRepository,
@@ -44,12 +47,14 @@ public class NetworkService {
                           DeviceRepository deviceRepository,
                           DeviceStatusRepository deviceStatusRepository,
                           FamilyMemberRepository familyMemberRepository,
+                          AlertService alertService,
                           SimpMessagingTemplate messagingTemplate) {
         this.networkStatusRepository = networkStatusRepository;
         this.networkHistoryRepository = networkHistoryRepository;
         this.deviceRepository = deviceRepository;
         this.deviceStatusRepository = deviceStatusRepository;
         this.familyMemberRepository = familyMemberRepository;
+        this.alertService = alertService;
         this.messagingTemplate = messagingTemplate;
     }
 
@@ -91,6 +96,25 @@ public class NetworkService {
             ds.setNetworkQuality(quality);
             ds.setLastSyncAt(Instant.now());
             deviceStatusRepository.save(ds);
+        }
+
+        // 2b. Handle Offline / Online Alert transitions
+        if (device.getFamily() != null) {
+            boolean isOnline = isNetAvail && isInternetAvail;
+            if (!isOnline) {
+                String devName = device.getDeviceName() != null ? device.getDeviceName() : "Device";
+                alertService.triggerOrUpdateAlert(
+                        device.getFamily(),
+                        device,
+                        "OFFLINE",
+                        "WARNING",
+                        "Device Offline",
+                        devName + " has lost network connection.",
+                        "PARENT"
+                );
+            } else {
+                alertService.resolveAlert(device.getId(), "OFFLINE");
+            }
         }
 
         // 3. Append to NetworkHistory

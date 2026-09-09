@@ -1,5 +1,7 @@
 package com.nivya.location.service;
 
+import com.nivya.alerts.service.AlertService;
+
 import com.nivya.common.exception.ResourceNotFoundException;
 import com.nivya.consent.entity.Consent;
 import com.nivya.consent.repository.ConsentRepository;
@@ -41,6 +43,7 @@ public class LocationService {
     private final DeviceStatusRepository deviceStatusRepository;
     private final FamilyMemberRepository familyMemberRepository;
     private final ConsentRepository consentRepository;
+    private final AlertService alertService;
     private final SimpMessagingTemplate messagingTemplate;
 
     public LocationService(LocationStatusRepository locationStatusRepository,
@@ -49,6 +52,7 @@ public class LocationService {
                            DeviceStatusRepository deviceStatusRepository,
                            FamilyMemberRepository familyMemberRepository,
                            ConsentRepository consentRepository,
+                           AlertService alertService,
                            SimpMessagingTemplate messagingTemplate) {
         this.locationStatusRepository = locationStatusRepository;
         this.locationHistoryRepository = locationHistoryRepository;
@@ -56,6 +60,7 @@ public class LocationService {
         this.deviceStatusRepository = deviceStatusRepository;
         this.familyMemberRepository = familyMemberRepository;
         this.consentRepository = consentRepository;
+        this.alertService = alertService;
         this.messagingTemplate = messagingTemplate;
     }
 
@@ -129,6 +134,26 @@ public class LocationService {
             DeviceStatus devStatus = devStatusOpt.get();
             devStatus.setLastSyncAt(Instant.now());
             deviceStatusRepository.save(devStatus);
+        }
+
+        // 3b. Stale Location Alert Handling
+        if (device.getFamily() != null) {
+            boolean gpsAvail = Boolean.TRUE.equals(request.getIsGpsAvailable());
+            if (!gpsAvail || isStale) {
+                String devName = device.getDeviceName() != null ? device.getDeviceName() : "Device";
+                String reason = !gpsAvail ? "GPS is disabled" : "No location updates in >15m";
+                alertService.triggerOrUpdateAlert(
+                        device.getFamily(),
+                        device,
+                        "STALE_LOCATION",
+                        "WARNING",
+                        "Stale Location Alert",
+                        devName + " location is stale (" + reason + "). Showing last known coordinates.",
+                        "PARENT"
+                );
+            } else {
+                alertService.resolveAlert(device.getId(), "STALE_LOCATION");
+            }
         }
 
         LocationStatusResponse response = mapToStatusResponse(status, device);

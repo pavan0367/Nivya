@@ -94,13 +94,20 @@ class BatteryIntegrationTest {
     @Autowired
     private com.nivya.consent.repository.ConsentRepository consentRepository;
 
+    @Autowired
+    private com.nivya.alerts.repository.NotificationRecordRepository notificationRecordRepository;
+
+    @Autowired
+    private com.nivya.alerts.repository.AlertRuleRepository alertRuleRepository;
+
     @BeforeEach
     void setUp() throws Exception {
         locationHistoryRepository.deleteAll();
         locationStatusRepository.deleteAll();
         batteryHistoryRepository.deleteAll();
         batteryStatusRepository.deleteAll();
-
+        notificationRecordRepository.deleteAll();
+        alertRuleRepository.deleteAll();
         alertRepository.deleteAll();
         deviceStatusRepository.deleteAll();
         deviceRepository.deleteAll();
