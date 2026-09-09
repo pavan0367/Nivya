@@ -48,18 +48,19 @@ export const AuthLayout: React.FC = () => {
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div
             style={{
-              width: '54px',
-              height: '54px',
+              width: '64px',
+              height: '64px',
               margin: '0 auto 1rem',
               borderRadius: '16px',
-              background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 8px 24px rgba(99, 102, 241, 0.4)',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
             }}
           >
-            <ShieldCheck size={32} color="#ffffff" />
+            <img src="/logo.png" alt="Nivya Logo" style={{ width: '46px', height: '46px', objectFit: 'contain' }} />
           </div>
           <h1
             style={{

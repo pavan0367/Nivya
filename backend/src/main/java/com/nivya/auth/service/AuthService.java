@@ -8,6 +8,7 @@ import com.nivya.auth.exception.InvalidTokenException;
 import com.nivya.auth.repository.RefreshTokenRepository;
 import com.nivya.security.UserPrincipal;
 import com.nivya.security.jwt.JwtTokenProvider;
+import com.nivya.session.service.DeviceSessionService;
 import com.nivya.user.entity.User;
 import com.nivya.user.entity.UserStatus;
 import com.nivya.user.repository.UserRepository;
@@ -37,6 +38,7 @@ public class AuthService {
     private final JwtTokenProvider tokenProvider;
     private final AuthRateLimiter authRateLimiter;
     private final AuditService auditService;
+    private final DeviceSessionService deviceSessionService;
     private final long refreshTokenExpirationMs;
 
     public AuthService(
@@ -46,6 +48,7 @@ public class AuthService {
             JwtTokenProvider tokenProvider,
             AuthRateLimiter authRateLimiter,
             AuditService auditService,
+            DeviceSessionService deviceSessionService,
             @Value("${nivya.jwt.refresh-token-expiration-ms:604800000}") long refreshTokenExpirationMs) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
@@ -53,6 +56,7 @@ public class AuthService {
         this.tokenProvider = tokenProvider;
         this.authRateLimiter = authRateLimiter;
         this.auditService = auditService;
+        this.deviceSessionService = deviceSessionService;
         this.refreshTokenExpirationMs = refreshTokenExpirationMs;
     }
 
@@ -128,6 +132,16 @@ public class AuthService {
         String accessToken = tokenProvider.generateAccessToken(principal);
         String refreshTokenString = createRefreshToken(user, request.getDeviceFingerprint());
 
+        deviceSessionService.recordLogin(
+                user,
+                request.getDeviceFingerprint(),
+                request.getDeviceName(),
+                request.getPlatform(),
+                request.getOsVersion(),
+                request.getAppVersion(),
+                ipAddress
+        );
+
         log.info("User {} logged in successfully with role {}", user.getEmail(), user.getRole());
 
         return new AuthResponse(
@@ -198,6 +212,11 @@ public class AuthService {
                     });
         } else if (principal != null) {
             refreshTokenRepository.revokeAllUserTokens(principal.getId(), Instant.now());
+        }
+
+        if (principal != null) {
+            userRepository.findById(principal.getId()).ifPresent(user ->
+                    deviceSessionService.recordLogout(user, refreshTokenString, ipAddress));
         }
 
         Long userId = principal != null ? principal.getId() : null;

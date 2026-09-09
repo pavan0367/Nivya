@@ -182,4 +182,39 @@ class PairingRepository(
             }
         }
     }
+
+    suspend fun generateDisconnectCode(): NetworkResult<GenerateDisconnectCodeResponseDto> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = apiService.generateDisconnectCode()
+                if (response.isSuccessful && response.body()?.data != null) {
+                    NetworkResult.Success(response.body()!!.data!!)
+                } else {
+                    val msg = response.body()?.message ?: "Failed to generate disconnect code"
+                    NetworkResult.Error(code = response.code(), message = msg)
+                }
+            } catch (e: Exception) {
+                NetworkResult.Exception(e)
+            }
+        }
+    }
+
+    suspend fun verifyDisconnectCode(code: String): NetworkResult<Unit> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = apiService.verifyDisconnectCode(VerifyDisconnectCodeRequestDto(code.trim().uppercase()))
+                if (response.isSuccessful) {
+                    // Intentional disconnect: clear local persistent cache
+                    familyDao.clearFamily()
+                    deviceStatusDao.clearDevices()
+                    NetworkResult.Success(Unit)
+                } else {
+                    val msg = response.body()?.message ?: "Invalid or expired disconnect code"
+                    NetworkResult.Error(code = response.code(), message = msg)
+                }
+            } catch (e: Exception) {
+                NetworkResult.Exception(e)
+            }
+        }
+    }
 }

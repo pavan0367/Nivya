@@ -1,0 +1,367 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000012C8D000100000001 /* NivyaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000022C8D000100000001 /* NivyaApp.swift */; };
+		A10000032C8D000100000001 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000042C8D000100000001 /* AppState.swift */; };
+		A10000052C8D000100000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000062C8D000100000001 /* Assets.xcassets */; };
+		A10000072C8D000100000001 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = A10000082C8D000100000001 /* LaunchScreen.storyboard */; };
+		B10000012C8D000100000001 /* AuthenticationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000022C8D000100000001 /* AuthenticationTests.swift */; };
+		B10000032C8D000100000001 /* PairingAndReloginTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000042C8D000100000001 /* PairingAndReloginTests.swift */; };
+		B10000052C8D000100000001 /* ProtectedDisconnectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000062C8D000100000001 /* ProtectedDisconnectTests.swift */; };
+		B10000072C8D000100000001 /* CrackFreakTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000082C8D000100000001 /* CrackFreakTests.swift */; };
+		B10000092C8D000100000001 /* ChildDashboardOrderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000102C8D000100000001 /* ChildDashboardOrderTests.swift */; };
+		B10000112C8D000100000001 /* CrossPlatformParentIPhoneChildAndroidTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000122C8D000100000001 /* CrossPlatformParentIPhoneChildAndroidTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A10000022C8D000100000001 /* NivyaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NivyaApp.swift; sourceTree = "<group>"; };
+		A10000042C8D000100000001 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		A10000062C8D000100000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A10000082C8D000100000001 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		A10000092C8D000100000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A10000102C8D000100000001 /* Nivya.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nivya.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10000022C8D000100000001 /* AuthenticationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationTests.swift; sourceTree = "<group>"; };
+		B10000042C8D000100000001 /* PairingAndReloginTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingAndReloginTests.swift; sourceTree = "<group>"; };
+		B10000062C8D000100000001 /* ProtectedDisconnectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectedDisconnectTests.swift; sourceTree = "<group>"; };
+		B10000082C8D000100000001 /* CrackFreakTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrackFreakTests.swift; sourceTree = "<group>"; };
+		B10000102C8D000100000001 /* ChildDashboardOrderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChildDashboardOrderTests.swift; sourceTree = "<group>"; };
+		B10000122C8D000100000001 /* CrossPlatformParentIPhoneChildAndroidTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossPlatformParentIPhoneChildAndroidTests.swift; sourceTree = "<group>"; };
+		B10000202C8D000100000001 /* NivyaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NivyaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A10000112C8D000100000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B10000212C8D000100000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A10000122C8D000100000001 = {
+			isa = PBXGroup;
+			children = (
+				A10000132C8D000100000001 /* Nivya */,
+				B10000222C8D000100000001 /* NivyaTests */,
+				A10000142C8D000100000001 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A10000132C8D000100000001 /* Nivya */ = {
+			isa = PBXGroup;
+			children = (
+				A10000022C8D000100000001 /* NivyaApp.swift */,
+				A10000042C8D000100000001 /* AppState.swift */,
+				A10000062C8D000100000001 /* Assets.xcassets */,
+				A10000082C8D000100000001 /* LaunchScreen.storyboard */,
+				A10000092C8D000100000001 /* Info.plist */,
+			);
+			path = Nivya;
+			sourceTree = "<group>";
+		};
+		B10000222C8D000100000001 /* NivyaTests */ = {
+			isa = PBXGroup;
+			children = (
+				B10000022C8D000100000001 /* AuthenticationTests.swift */,
+				B10000042C8D000100000001 /* PairingAndReloginTests.swift */,
+				B10000062C8D000100000001 /* ProtectedDisconnectTests.swift */,
+				B10000082C8D000100000001 /* CrackFreakTests.swift */,
+				B10000102C8D000100000001 /* ChildDashboardOrderTests.swift */,
+				B10000122C8D000100000001 /* CrossPlatformParentIPhoneChildAndroidTests.swift */,
+			);
+			path = NivyaTests;
+			sourceTree = "<group>";
+		};
+		A10000142C8D000100000001 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A10000102C8D000100000001 /* Nivya.app */,
+				B10000202C8D000100000001 /* NivyaTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A10000152C8D000100000001 /* Nivya */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A10000162C8D000100000001 /* Build configuration list for PBXNativeTarget "Nivya" */;
+			buildPhases = (
+				A10000172C8D000100000001 /* Sources */,
+				A10000112C8D000100000001 /* Frameworks */,
+				A10000182C8D000100000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Nivya;
+			productName = Nivya;
+			productReference = A10000102C8D000100000001 /* Nivya.app */;
+			productType = "com.apple.product-type.application";
+		};
+		B10000232C8D000100000001 /* NivyaTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B10000242C8D000100000001 /* Build configuration list for PBXNativeTarget "NivyaTests" */;
+			buildPhases = (
+				B10000252C8D000100000001 /* Sources */,
+				B10000212C8D000100000001 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = NivyaTests;
+			productName = NivyaTests;
+			productReference = B10000202C8D000100000001 /* NivyaTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A10000192C8D000100000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1520;
+				LastUpgradeCheck = 1520;
+				TargetAttributes = {
+					A10000152C8D000100000001 = {
+						CreatedOnToolsVersion = 15.2;
+					};
+					B10000232C8D000100000001 = {
+						CreatedOnToolsVersion = 15.2;
+						TestTargetID = A10000152C8D000100000001;
+					};
+				};
+			};
+			buildConfigurationList = A10000202C8D000100000001 /* Build configuration list for PBXProject "Nivya" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A10000122C8D000100000001;
+			productRefGroup = A10000142C8D000100000001 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A10000152C8D000100000001 /* Nivya */,
+				B10000232C8D000100000001 /* NivyaTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A10000182C8D000100000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000052C8D000100000001 /* Assets.xcassets in Resources */,
+				A10000072C8D000100000001 /* LaunchScreen.storyboard in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A10000172C8D000100000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000012C8D000100000001 /* NivyaApp.swift in Sources */,
+				A10000032C8D000100000001 /* AppState.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B10000252C8D000100000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B10000012C8D000100000001 /* AuthenticationTests.swift in Sources */,
+				B10000032C8D000100000001 /* PairingAndReloginTests.swift in Sources */,
+				B10000052C8D000100000001 /* ProtectedDisconnectTests.swift in Sources */,
+				B10000072C8D000100000001 /* CrackFreakTests.swift in Sources */,
+				B10000092C8D000100000001 /* ChildDashboardOrderTests.swift in Sources */,
+				B10000112C8D000100000001 /* CrossPlatformParentIPhoneChildAndroidTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A10000212C8D000100000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A10000222C8D000100000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		A10000232C8D000100000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Nivya/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nivya.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A10000242C8D000100000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Nivya/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nivya.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		B10000262C8D000100000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nivya.ios.NivyaTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Nivya.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Nivya";
+			};
+			name = Debug;
+		};
+		B10000272C8D000100000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nivya.ios.NivyaTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Nivya.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Nivya";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A10000162C8D000100000001 /* Build configuration list for PBXNativeTarget "Nivya" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000232C8D000100000001 /* Debug */,
+				A10000242C8D000100000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B10000242C8D000100000001 /* Build configuration list for PBXNativeTarget "NivyaTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B10000262C8D000100000001 /* Debug */,
+				B10000272C8D000100000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A10000202C8D000100000001 /* Build configuration list for PBXProject "Nivya" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000212C8D000100000001 /* Debug */,
+				A10000222C8D000100000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A10000192C8D000100000001 /* Project object */;
+}

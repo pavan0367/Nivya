@@ -24,10 +24,18 @@ import com.nivya.security.UserPrincipal;
 import com.nivya.user.entity.User;
 import com.nivya.user.repository.UserRepository;
 import com.nivya.websocket.service.RealtimeBroadcastService;
+import com.nivya.pairing.entity.DisconnectCode;
+import com.nivya.pairing.repository.DisconnectCodeRepository;
+import org.springframework.security.access.AccessDeniedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -58,6 +66,7 @@ public class PairingService {
     private final AuditLogRepository auditLogRepository;
     private final PairingRateLimiter rateLimiter;
     private final RealtimeBroadcastService realtimeBroadcastService;
+    private final DisconnectCodeRepository disconnectCodeRepository;
 
     public PairingService(PairingRequestRepository pairingRequestRepository,
                           UserRepository userRepository,
@@ -68,7 +77,8 @@ public class PairingService {
                           ConsentRepository consentRepository,
                           AuditLogRepository auditLogRepository,
                           PairingRateLimiter rateLimiter,
-                          RealtimeBroadcastService realtimeBroadcastService) {
+                          RealtimeBroadcastService realtimeBroadcastService,
+                          DisconnectCodeRepository disconnectCodeRepository) {
         this.pairingRequestRepository = pairingRequestRepository;
         this.userRepository = userRepository;
         this.familyRepository = familyRepository;
@@ -79,6 +89,7 @@ public class PairingService {
         this.auditLogRepository = auditLogRepository;
         this.rateLimiter = rateLimiter;
         this.realtimeBroadcastService = realtimeBroadcastService;
+        this.disconnectCodeRepository = disconnectCodeRepository;
     }
 
     /**
@@ -313,6 +324,164 @@ public class PairingService {
         realtimeBroadcastService.broadcastPairingEvent(parentMembership.getFamily().getId(), statusResponse);
     }
 
+    /**
+     * Generates a secure, one-time, 10-minute expiring disconnect code (Parent only).
+     * Never logs plaintext code.
+     */
+    @Transactional
+    public GenerateDisconnectCodeResponse generateDisconnectCode(UserPrincipal principal, String ipAddress) {
+        if (principal.getRole() != RoleType.PARENT) {
+            throw new AccessDeniedException("Only Parent accounts can generate a disconnect code");
+        }
+
+        FamilyMember parentMember = familyMemberRepository.findByUserId(principal.getId())
+                .orElseThrow(() -> new PairingException("Parent is not associated with any family"));
+        Long familyId = parentMember.getFamily().getId();
+
+        Long childUserId = familyMemberRepository.findByFamilyId(familyId).stream()
+                .filter(m -> RoleType.CHILD.equals(m.getMemberRole()) || "CHILD".equalsIgnoreCase(String.valueOf(m.getMemberRole())))
+                .map(m -> m.getUser().getId())
+                .findFirst()
+                .orElse(null);
+
+        // Invalidate previous active disconnect codes for this family
+        List<DisconnectCode> existingCodes = disconnectCodeRepository.findByFamilyIdAndStatus(familyId, "PENDING");
+        for (DisconnectCode dc : existingCodes) {
+            dc.revoke();
+            disconnectCodeRepository.save(dc);
+        }
+
+        // Generate cryptographically secure random code
+        String code = generateDisconnectCodeString();
+        String codeHash = sha256(code);
+        Instant expiresAt = Instant.now().plus(Duration.ofMinutes(10));
+
+        DisconnectCode disconnectCode = new DisconnectCode(familyId, principal.getId(), childUserId, codeHash, expiresAt);
+        disconnectCodeRepository.save(disconnectCode);
+
+        // Security audit: never log plaintext code
+        auditLogRepository.save(new AuditLog(
+                principal.getId(),
+                "DISCONNECT_CODE_GENERATED",
+                "Generated one-time disconnect code for family " + parentMember.getFamily().getFamilyCode() + ", expires: " + expiresAt,
+                ipAddress
+        ));
+
+        log.info("Parent {} generated disconnect code for family {}", principal.getEmail(), parentMember.getFamily().getFamilyCode());
+        return new GenerateDisconnectCodeResponse(code, expiresAt, 600);
+    }
+
+    /**
+     * Validates Parent-generated disconnect code entered by Child device.
+     * Enforces rate limiting, single-use, expiration, and family isolation.
+     */
+    @Transactional
+    public void verifyDisconnectCode(UserPrincipal principal, VerifyDisconnectCodeRequest request, String ipAddress) {
+        if (principal.getRole() != RoleType.CHILD) {
+            throw new AccessDeniedException("Only Child companion devices can submit a disconnect code");
+        }
+
+        FamilyMember childMember = familyMemberRepository.findByUserId(principal.getId())
+                .orElseThrow(() -> new PairingException("Child is not associated with any family unit"));
+        Long familyId = childMember.getFamily().getId();
+
+        String rateLimitKey = "disconnect:" + principal.getId() + ":" + ipAddress;
+        if (rateLimiter.isRateLimited(rateLimitKey)) {
+            auditLogRepository.save(new AuditLog(
+                    principal.getId(),
+                    "DISCONNECT_RATE_LIMIT_BLOCKED",
+                    "Rate limited on disconnect attempts",
+                    ipAddress
+            ));
+            throw new RateLimitExceededException("Too many failed disconnect attempts. Please wait 15 minutes.");
+        }
+
+        String inputCode = normalizeDisconnectCode(request.getCode());
+        String inputHash = sha256(inputCode);
+
+        Optional<DisconnectCode> optCode = disconnectCodeRepository.findFirstByFamilyIdAndStatusOrderByCreatedAtDesc(familyId, "PENDING");
+        if (optCode.isEmpty()) {
+            rateLimiter.recordFailedAttempt(rateLimitKey);
+            auditLogRepository.save(new AuditLog(
+                    principal.getId(),
+                    "DISCONNECT_CODE_NOT_FOUND",
+                    "No pending disconnect code for family",
+                    ipAddress
+            ));
+            throw new PairingException("Invalid, expired, or non-existent disconnect code.");
+        }
+
+        DisconnectCode dc = optCode.get();
+        if (dc.isExpired()) {
+            dc.setStatus("EXPIRED");
+            disconnectCodeRepository.save(dc);
+            rateLimiter.recordFailedAttempt(rateLimitKey);
+            auditLogRepository.save(new AuditLog(
+                    principal.getId(),
+                    "DISCONNECT_CODE_EXPIRED",
+                    "Disconnect code expired",
+                    ipAddress
+            ));
+            throw new PairingException("Disconnect code has expired. Please ask parent for a new code.");
+        }
+
+        if (dc.isExhausted()) {
+            rateLimiter.recordFailedAttempt(rateLimitKey);
+            auditLogRepository.save(new AuditLog(
+                    principal.getId(),
+                    "DISCONNECT_CODE_EXHAUSTED",
+                    "Disconnect code exceeded max attempts",
+                    ipAddress
+            ));
+            throw new PairingException("Disconnect code has exceeded maximum verification attempts.");
+        }
+
+        dc.incrementAttempts();
+
+        if (!dc.getCodeHash().equals(inputHash)) {
+            disconnectCodeRepository.save(dc);
+            rateLimiter.recordFailedAttempt(rateLimitKey);
+            auditLogRepository.save(new AuditLog(
+                    principal.getId(),
+                    "DISCONNECT_CODE_MISMATCH",
+                    "Incorrect disconnect code submitted",
+                    ipAddress
+            ));
+            throw new PairingException("Invalid disconnect code.");
+        }
+
+        // Success: mark code as used
+        dc.markUsed();
+        disconnectCodeRepository.save(dc);
+        rateLimiter.recordSuccess(rateLimitKey);
+
+        // Unlink child device and remove child membership from family
+        List<Device> childDevices = deviceRepository.findByFamilyId(familyId).stream()
+                .filter(d -> d.getUser().getId().equals(principal.getId()))
+                .toList();
+
+        for (Device d : childDevices) {
+            d.setFamily(null);
+            d.setStatus("DISCONNECTED");
+            deviceRepository.save(d);
+        }
+
+        familyMemberRepository.delete(childMember);
+
+        auditLogRepository.save(new AuditLog(
+                principal.getId(),
+                "DISCONNECT_SUCCESSFUL",
+                "Child device and membership successfully unlinked via validated parent code from family " + familyId,
+                ipAddress
+        ));
+
+        log.info("Child {} successfully disconnected from family {}", principal.getEmail(), familyId);
+
+        // Broadcast updated pairing status to family via WebSocket
+        PairingStatusResponse statusResponse = buildStatusResponse(childMember.getFamily(), RoleType.PARENT);
+        realtimeBroadcastService.broadcastPairingEvent(familyId, statusResponse);
+    }
+
     // =========================================================================
     // Helper Methods
     // =========================================================================
@@ -479,5 +648,39 @@ public class PairingService {
             return "NV-" + clean.substring(0, 4) + "-" + clean.substring(4, 8);
         }
         return code.trim().toUpperCase();
+    }
+
+    private String generateDisconnectCodeString() {
+        StringBuilder sb = new StringBuilder("DIS-");
+        for (int i = 0; i < 4; i++) {
+            sb.append(CODE_CHARS.charAt(RANDOM.nextInt(CODE_CHARS.length())));
+        }
+        sb.append("-");
+        for (int i = 0; i < 4; i++) {
+            sb.append(CODE_CHARS.charAt(RANDOM.nextInt(CODE_CHARS.length())));
+        }
+        return sb.toString();
+    }
+
+    private String normalizeDisconnectCode(String code) {
+        if (code == null) return "";
+        String clean = code.trim().toUpperCase().replaceAll("[^A-Z0-9]", "");
+        if (clean.startsWith("DIS") && clean.length() == 11) {
+            return "DIS-" + clean.substring(3, 7) + "-" + clean.substring(7, 11);
+        }
+        if (clean.length() == 8) {
+            return "DIS-" + clean.substring(0, 4) + "-" + clean.substring(4, 8);
+        }
+        return code.trim().toUpperCase();
+    }
+
+    private String sha256(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 algorithm unavailable", e);
+        }
     }
 }

@@ -97,12 +97,10 @@ export const DashboardLayout: React.FC = () => {
       {/* Sidebar Navigation */}
       <aside className="sidebar">
         {/* Brand Header */}
-        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'var(--primary-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontWeight: 800, color: '#fff', fontSize: '1.2rem' }}>N</span>
-          </div>
+        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+          <img src="/logo.png" alt="Nivya Logo" style={{ width: '36px', height: '36px', objectFit: 'contain' }} />
           <div>
-            <h2 style={{ fontSize: '1.15rem', fontWeight: 700, letterSpacing: '-0.02em', color: '#fff' }}>Nivya</h2>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 700, letterSpacing: '-0.02em', color: '#fff' }}>Nivya</h2>
             <small style={{ color: 'var(--text-dim)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Parent Console</small>
           </div>
         </div>

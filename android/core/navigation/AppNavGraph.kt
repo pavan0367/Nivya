@@ -22,6 +22,7 @@ import com.nivya.ui.battery.ChildBatteryScreen
 import com.nivya.ui.battery.ChildBatteryViewModel
 import com.nivya.ui.cleanup.ChildCleanUpScreen
 import com.nivya.ui.cleanup.ChildCleanUpViewModel
+import com.nivya.ui.splash.SplashScreen
 import com.nivya.ui.common.*
 import com.nivya.ui.convocation.*
 import com.nivya.ui.dashboard.*
@@ -73,13 +74,9 @@ fun AppNavGraph(
     val isLoggedIn = remember { appContainer.authRepository.isLoggedIn() }
     val savedRole = remember { appContainer.roleRepository.getSavedRole() }
 
-    val startDestination = when {
-        !isLoggedIn -> NavigationDestination.Login.route
-        savedRole == null -> NavigationDestination.RoleSelection.route
-        else -> "pairing/connection/${savedRole.name}"
-    }
+    val startDestination = NavigationDestination.Splash.route
 
-    val isAuthFlow = currentRoute.startsWith("auth/") || currentRoute.startsWith("pairing/")
+    val isAuthFlow = currentRoute == NavigationDestination.Splash.route || currentRoute.startsWith("auth/") || currentRoute.startsWith("pairing/")
     val activeRole = when {
         currentRoute.startsWith("parent/") -> RoleType.PARENT
         currentRoute.startsWith("child/") -> RoleType.CHILD
@@ -184,6 +181,18 @@ fun AppNavGraph(
                 startDestination = startDestination,
                 modifier = Modifier.padding(innerPadding)
             ) {
+                // 0. Splash Startup
+                composable(route = NavigationDestination.Splash.route) {
+                    SplashScreen(
+                        appContainer = appContainer,
+                        onNavigateTo = { targetRoute ->
+                            navController.navigate(targetRoute) {
+                                popUpTo(NavigationDestination.Splash.route) { inclusive = true }
+                            }
+                        }
+                    )
+                }
+
                 // 1. Auth & Setup
                 composable(route = NavigationDestination.Login.route) {
                     val loginViewModel: LoginViewModel = viewModel(
@@ -192,13 +201,31 @@ fun AppNavGraph(
                     LoginScreen(
                         viewModel = loginViewModel,
                         onAuthSuccess = { roleStr ->
-                            if (roleStr.isNullOrBlank()) {
-                                navController.navigate(NavigationDestination.RoleSelection.route) {
-                                    popUpTo(NavigationDestination.Login.route) { inclusive = true }
+                            coroutineScope.launch {
+                                val cachedFamily = try {
+                                    appContainer.database.familyDao().getFamily()
+                                } catch (_: Exception) {
+                                    null
                                 }
-                            } else {
-                                navController.navigate("pairing/connection/$roleStr") {
-                                    popUpTo(NavigationDestination.Login.route) { inclusive = true }
+                                val isPaired = cachedFamily?.isPaired == true
+                                if (isPaired && !roleStr.isNullOrBlank()) {
+                                    // Direct dashboard routing: bypass role selection & pairing screen
+                                    val destination = if (roleStr.equals("PARENT", ignoreCase = true)) {
+                                        NavigationDestination.ParentDashboard.route
+                                    } else {
+                                        NavigationDestination.ChildDashboard.route
+                                    }
+                                    navController.navigate(destination) {
+                                        popUpTo(NavigationDestination.Login.route) { inclusive = true }
+                                    }
+                                } else if (roleStr.isNullOrBlank()) {
+                                    navController.navigate(NavigationDestination.RoleSelection.route) {
+                                        popUpTo(NavigationDestination.Login.route) { inclusive = true }
+                                    }
+                                } else {
+                                    navController.navigate("pairing/connection/$roleStr") {
+                                        popUpTo(NavigationDestination.Login.route) { inclusive = true }
+                                    }
                                 }
                             }
                         }
@@ -308,7 +335,8 @@ fun AppNavGraph(
                     ParentFamilyDevicesScreen(
                         onPairNewDevice = {
                             navController.navigate("pairing/connection/PARENT")
-                        }
+                        },
+                        pairingRepository = appContainer.pairingRepository
                     )
                 }
                 composable(route = NavigationDestination.ParentSettings.route) {
@@ -317,7 +345,10 @@ fun AppNavGraph(
 
                 // 3. Child Destinations
                 composable(route = NavigationDestination.ChildDashboard.route) {
-                    ChildDashboardScreen(onNavigateTo = { dest -> navController.navigate(dest.route) })
+                    ChildDashboardScreen(
+                        onNavigateTo = { dest -> navController.navigate(dest.route) },
+                        convocationRepository = appContainer.convocationRepository
+                    )
                 }
                 composable(route = NavigationDestination.ChildBattery.route) {
                     val batteryViewModel: ChildBatteryViewModel = viewModel(
@@ -372,7 +403,14 @@ fun AppNavGraph(
                     ChildConvocationScreen(viewModel = convocationViewModel)
                 }
                 composable(route = NavigationDestination.ChildSettings.route) {
-                    ChildSettingsScreen()
+                    ChildSettingsScreen(
+                        pairingRepository = appContainer.pairingRepository,
+                        onDisconnected = {
+                            navController.navigate(NavigationDestination.Login.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                    )
                 }
             }
         }

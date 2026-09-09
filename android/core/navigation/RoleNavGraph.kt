@@ -10,6 +10,7 @@ import com.nivya.ui.role.RoleType
  */
 sealed class NavigationDestination(val route: String, val title: String) {
     // Auth & Setup destinations
+    object Splash : NavigationDestination("splash", "Splash")
     object Login : NavigationDestination("auth/login", "Login")
     object RoleSelection : NavigationDestination("auth/role_selection", "Role Selection")
     object Connection : NavigationDestination("pairing/connection/{role}", "Connection")

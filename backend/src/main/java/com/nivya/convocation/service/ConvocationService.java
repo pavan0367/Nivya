@@ -251,11 +251,30 @@ public class ConvocationService {
 
         FamilyMember parentMember = findParentInFamily(familyId);
 
+        String trimmedMessage = request.getMessage().trim();
+
+        // Idempotency check: prevent duplicate rapid message creation (CRACK/FREAK / network retries)
+        List<ConvocationMessage> history = messageRepository.findByFamilyIdOrderByCreatedAtAsc(familyId);
+        if (!history.isEmpty()) {
+            ConvocationMessage last = history.get(history.size() - 1);
+            if (last.getSenderUserId().equals(principal.getId()) &&
+                    trimmedMessage.equals(last.getMessage()) &&
+                    last.getCreatedAt() != null &&
+                    Duration.between(last.getCreatedAt(), Instant.now()).getSeconds() < 5) {
+                log.info("Duplicate child message suppressed by idempotency guard: {}", trimmedMessage);
+                Map<String, Object> ack = new HashMap<>();
+                ack.put("status", "DELIVERED");
+                ack.put("acknowledged", true);
+                ack.put("message", "Note received by family");
+                return ack;
+            }
+        }
+
         ConvocationMessage message = new ConvocationMessage(
                 familyId,
                 principal.getId(),
                 parentMember.getUser().getId(),
-                request.getMessage().trim()
+                trimmedMessage
         );
         message.setStatus("CHILD_SENT");
 

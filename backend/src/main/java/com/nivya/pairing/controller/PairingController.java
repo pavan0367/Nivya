@@ -70,6 +70,27 @@ public class PairingController {
         return ResponseEntity.ok(ApiResponse.success(null, "Device link revoked successfully"));
     }
 
+    @PostMapping("/disconnect/code")
+    @Operation(summary = "Generate Disconnect Code (Parent only)", description = "Generates a 10-minute, single-use disconnect code")
+    public ResponseEntity<ApiResponse<GenerateDisconnectCodeResponse>> generateDisconnectCode(
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest servletRequest) {
+        String ip = extractClientIp(servletRequest);
+        GenerateDisconnectCodeResponse response = pairingService.generateDisconnectCode(principal, ip);
+        return ResponseEntity.ok(ApiResponse.success(response, "Disconnect code generated successfully"));
+    }
+
+    @PostMapping("/disconnect/verify")
+    @Operation(summary = "Verify Disconnect Code (Child only)", description = "Validates the Parent-generated disconnect code and unlinks connection")
+    public ResponseEntity<ApiResponse<Void>> verifyDisconnectCode(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody VerifyDisconnectCodeRequest request,
+            HttpServletRequest servletRequest) {
+        String ip = extractClientIp(servletRequest);
+        pairingService.verifyDisconnectCode(principal, request, ip);
+        return ResponseEntity.ok(ApiResponse.success(null, "Relationship disconnected successfully"));
+    }
+
     private String extractClientIp(HttpServletRequest request) {
         String xfHeader = request.getHeader("X-Forwarded-For");
         if (xfHeader == null || xfHeader.isEmpty() || "unknown".equalsIgnoreCase(xfHeader)) {

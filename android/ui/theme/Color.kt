@@ -21,3 +21,7 @@ val TextMuted = Color(0xFF64748B)
 val SuccessGreen = Color(0xFF10B981)
 val ErrorRed = Color(0xFFEF4444)
 val WarningAmber = Color(0xFFF59E0B)
+val WarningYellow = WarningAmber
+val TealAccent = Color(0xFF14B8A6)
+val SurfaceCard = SurfaceVariantDark
+

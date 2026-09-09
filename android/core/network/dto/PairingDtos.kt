@@ -66,3 +66,13 @@ data class LinkedMemberDto(
 data class RevokePairingRequestDto(
     @SerializedName("targetDeviceId") val targetDeviceId: Long
 )
+
+data class GenerateDisconnectCodeResponseDto(
+    @SerializedName("code") val code: String,
+    @SerializedName("expiresAt") val expiresAt: String?,
+    @SerializedName("ttlSeconds") val ttlSeconds: Long
+)
+
+data class VerifyDisconnectCodeRequestDto(
+    @SerializedName("code") val code: String
+)

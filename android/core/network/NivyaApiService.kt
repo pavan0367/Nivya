@@ -63,6 +63,14 @@ interface NivyaApiService {
         @Body request: RevokePairingRequestDto
     ): Response<ApiResponseDto<Unit>>
 
+    @POST("api/v1/pairing/disconnect/code")
+    suspend fun generateDisconnectCode(): Response<ApiResponseDto<GenerateDisconnectCodeResponseDto>>
+
+    @POST("api/v1/pairing/disconnect/verify")
+    suspend fun verifyDisconnectCode(
+        @Body request: VerifyDisconnectCodeRequestDto
+    ): Response<ApiResponseDto<Unit>>
+
     // --- Battery Telemetry ---
     @POST("api/v1/battery/telemetry")
     suspend fun sendBatteryTelemetry(
