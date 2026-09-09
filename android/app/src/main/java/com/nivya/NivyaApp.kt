@@ -5,6 +5,7 @@ import androidx.work.Configuration
 import com.nivya.core.di.AppContainer
 import com.nivya.core.di.DefaultAppContainer
 import com.nivya.services.sync.BatterySyncWorker
+import com.nivya.services.sync.DeviceHealthSyncWorker
 import com.nivya.services.sync.LocationSyncWorker
 import com.nivya.services.sync.NetworkSyncWorker
 import com.nivya.services.sync.UsageSyncWorker
@@ -24,6 +25,7 @@ class NivyaApp : Application(), Configuration.Provider {
         NetworkSyncWorker.schedulePeriodic(this)
         UsageSyncWorker.schedulePeriodic(this)
         LocationSyncWorker.schedulePeriodic(this)
+        DeviceHealthSyncWorker.schedulePeriodic(this)
     }
 
 

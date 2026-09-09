@@ -140,6 +140,20 @@ interface NivyaApiService {
         @retrofit2.http.Query("startTime") startTime: String? = null,
         @retrofit2.http.Query("endTime") endTime: String? = null
     ): Response<ApiResponseDto<LocationHistoryResponseDto>>
+
+    // --- Device Health Telemetry ---
+    @POST("api/v1/device/health/telemetry")
+    suspend fun sendDeviceHealthTelemetry(
+        @Body request: DeviceHealthTelemetryRequestDto
+    ): Response<ApiResponseDto<DeviceHealthResponseDto>>
+
+    @GET("api/v1/device/health/{deviceId}")
+    suspend fun getDeviceHealth(
+        @retrofit2.http.Path("deviceId") deviceId: Long
+    ): Response<ApiResponseDto<DeviceHealthResponseDto>>
+
+    @GET("api/v1/device/health/my")
+    suspend fun getMyDeviceHealth(): Response<ApiResponseDto<DeviceHealthResponseDto>>
 }
 
 

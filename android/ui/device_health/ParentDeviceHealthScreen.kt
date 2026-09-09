@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -13,12 +12,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.nivya.core.network.dto.DeviceHealthResponseDto
 import com.nivya.ui.common.*
 import com.nivya.ui.theme.*
 
 /**
- * Parent Device Health Screen showing real-time battery status, charging state,
- * battery history, computed trends (%/hr drain), and hardware diagnostics for linked child devices.
+ * Detailed Parent Device Health screen displaying comprehensive system diagnostics:
+ * hardware specs, storage progress, RAM usage, battery telemetry, connectivity, and permission health audits.
  */
 @Composable
 fun ParentDeviceHealthScreen(
@@ -30,19 +30,7 @@ fun ParentDeviceHealthScreen(
         androidx.compose.runtime.mutableStateOf(ParentDeviceHealthUiState())
     }
 
-    val battery = uiState.batteryStatus
-    val trends = uiState.trends
-    val batteryPct = battery?.batteryPct ?: 78
-    val isCharging = battery?.chargingState?.contains("CHARGING", ignoreCase = true) == true
-    val isLow = batteryPct <= 20
-    val isCritical = batteryPct <= 15
-
-    val batteryAccent = when {
-        isCritical -> ErrorRed
-        isLow -> WarningAmber
-        isCharging -> BluePrimary
-        else -> SuccessGreen
-    }
+    val health = uiState.healthData
 
     Column(
         modifier = modifier
@@ -57,7 +45,14 @@ fun ParentDeviceHealthScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SectionHeader(title = "Device Health & Battery")
+            Column {
+                SectionHeader(title = "Device Health & Diagnostics")
+                Text(
+                    text = health?.deviceName ?: "Child Device",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
+                )
+            }
             IconButton(onClick = { viewModel?.loadData() }) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
@@ -67,36 +62,16 @@ fun ParentDeviceHealthScreen(
             }
         }
 
-        // Low Battery Alert Banner if applicable
-        if (isLow) {
-            NivyaCard(borderColor = WarningAmber) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.BatteryAlert,
-                        contentDescription = null,
-                        tint = WarningAmber,
-                        modifier = Modifier.size(36.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            text = "Low Battery Alert ($batteryPct%)",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = WarningAmber
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "${uiState.deviceName} is below the 20% safety threshold. Encourage device charging.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
-                        )
-                    }
-                }
-            }
+        // 1. Overall Health Condition Card
+        val score = health?.healthScore ?: 96
+        val scoreColor = when {
+            score >= 85 -> SuccessGreen
+            score >= 70 -> BlueLight
+            score >= 50 -> WarningAmber
+            else -> ErrorRed
         }
 
-        // Live Battery Status Hero Card
-        NivyaCard(borderColor = batteryAccent) {
+        NivyaCard(borderColor = scoreColor) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -104,179 +79,300 @@ fun ParentDeviceHealthScreen(
             ) {
                 Column {
                     Text(
-                        text = "Current Battery Level",
+                        text = "System Health Score",
                         style = MaterialTheme.typography.titleSmall,
                         color = TextSecondary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "$batteryPct%",
+                        text = "$score / 100",
                         style = MaterialTheme.typography.displaySmall,
-                        color = batteryAccent
+                        color = scoreColor
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = if (isCharging) "⚡ Charging (${battery?.chargingState ?: "AC"})" else "Discharging",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (isCharging) BlueLight else TextSecondary
+                        text = health?.healthStatus ?: "EXCELLENT",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = scoreColor
                     )
                 }
-
                 Icon(
-                    imageVector = if (isCharging) Icons.Default.BatteryChargingFull else if (isLow) Icons.Default.BatteryAlert else Icons.Default.BatteryFull,
+                    imageVector = if (score >= 70) Icons.Default.CheckCircle else Icons.Default.Warning,
                     contentDescription = null,
-                    tint = batteryAccent,
+                    tint = scoreColor,
                     modifier = Modifier.size(52.dp)
                 )
             }
-
-            Spacer(modifier = Modifier.height(14.dp))
-            LinearProgressIndicator(
-                progress = { (batteryPct / 100f).coerceIn(0f, 1f) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp),
-                color = batteryAccent,
-                trackColor = SurfaceVariantDark
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = health?.conditionSummary ?: "All device diagnostics are optimal.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
             )
         }
 
-        // Battery Trends Section
-        SectionHeader(title = "Telemetry Trends")
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            StatCard(
-                title = "Drain Rate",
-                value = trends?.drainRatePctPerHour?.let { "${String.format("%.1f", it)}%" } ?: "5.2%",
-                unit = "per hour",
-                icon = Icons.AutoMirrored.Filled.TrendingDown,
-                accentColor = BluePrimary,
-                modifier = Modifier.weight(1f)
-            )
-
-            StatCard(
-                title = "Est. Remaining",
-                value = trends?.estimatedHoursRemaining?.let { "${String.format("%.1f", it)}h" } ?: "15.0h",
-                unit = "runtime",
-                icon = Icons.Default.AccessTime,
-                accentColor = SuccessGreen,
-                modifier = Modifier.weight(1f)
-            )
-        }
-
+        // 2. Hardware & OS Specifications
+        SectionHeader(title = "Hardware & Operating System")
         NivyaCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = null,
-                    tint = BlueLight,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                val drainText = trends?.drainRatePctPerHour?.let { "Discharge rate is ${String.format("%.1f", it)}% per hour." }
-                    ?: "Telemetry trend indicates standard battery discharge."
-                Text(
-                    text = drainText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
-            }
-        }
-
-        // Recent Battery History
-        val points = uiState.historyPoints.take(5)
-        if (points.isNotEmpty()) {
-            SectionHeader(title = "Recent Battery History")
-            NivyaCard {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    for (i in points.indices) {
-                        val point = points[i]
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    text = "${point.batteryPct}% (${point.chargingState})",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = TextPrimary
-                                )
-                                val temp = point.temperatureCelsius
-                                if (temp != null) {
-                                    Text(
-                                        text = "Temp: ${String.format("%.1f", temp)}°C",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = TextMuted
-                                    )
-                                }
-                            }
-                            Text(
-                                text = point.recordedAt ?: "Recent",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = TextSecondary
-                            )
-                        }
-                        if (i < points.size - 1) {
-                            HorizontalDivider(color = OutlineDark)
-                        }
-                    }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = "Device Model", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    Text(text = health?.deviceModel ?: "Unknown Model", style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
+                }
+                HorizontalDivider(color = OutlineDark)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = "Manufacturer", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    Text(text = health?.deviceManufacturer ?: "Android OEM", style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
+                }
+                HorizontalDivider(color = OutlineDark)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = "Android OS", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    Text(text = health?.osVersion ?: "Android 14", style = MaterialTheme.typography.bodyMedium, color = BlueLight)
+                }
+                HorizontalDivider(color = OutlineDark)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = "API SDK Level", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    Text(text = "SDK ${health?.sdkVersion ?: 34}", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 }
             }
         }
 
-        // Hardware Diagnostics & Storage
-        SectionHeader(title = "Hardware & Storage Diagnostics")
+        // 3. Storage Diagnostics
+        val storage = health?.storage
+        val totalStorageGb = (storage?.totalBytes ?: 128_000_000_000L) / (1024.0 * 1024.0 * 1024.0)
+        val usedStorageGb = (storage?.usedBytes ?: 48_200_000_000L) / (1024.0 * 1024.0 * 1024.0)
+        val freeStorageGb = (storage?.freeBytes ?: 79_800_000_000L) / (1024.0 * 1024.0 * 1024.0)
+        val storageProgress = if (totalStorageGb > 0) (usedStorageGb / totalStorageGb).toFloat().coerceIn(0f, 1f) else 0.4f
+        val isLowStorage = storage?.isLowStorage == true
 
-        NivyaCard {
-            Text(
-                text = "Hardware Health & Temperature",
-                style = MaterialTheme.typography.titleSmall,
-                color = TextPrimary
-            )
-            Spacer(modifier = Modifier.height(6.dp))
+        SectionHeader(title = "Internal Storage Health")
+        NivyaCard(borderColor = if (isLowStorage) WarningAmber else OutlineDark) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Status: ${battery?.health ?: "GOOD"}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = SuccessGreen
+                    text = "${String.format("%.1f", usedStorageGb)} GB used of ${String.format("%.1f", totalStorageGb)} GB",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = TextPrimary
                 )
                 Text(
-                    text = "${battery?.temperatureCelsius ?: 31.0}°C",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = "${String.format("%.1f", storage?.usedPct ?: 37.6)}%",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (isLowStorage) WarningAmber else BlueLight
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            LinearProgressIndicator(
+                progress = { storageProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp),
+                color = if (isLowStorage) WarningAmber else BluePrimary,
+                trackColor = SurfaceVariantDark
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "${String.format("%.1f", freeStorageGb)} GB free space available.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+        }
+
+        // 4. Memory (RAM) Diagnostics
+        val memory = health?.memory
+        val totalRamGb = (memory?.totalBytes ?: 8_000_000_000L) / (1024.0 * 1024.0 * 1024.0)
+        val usedRamGb = (memory?.usedBytes ?: 4_100_000_000L) / (1024.0 * 1024.0 * 1024.0)
+        val ramProgress = if (totalRamGb > 0) (usedRamGb / totalRamGb).toFloat().coerceIn(0f, 1f) else 0.5f
+        val isLowRam = memory?.isLowRam == true
+
+        SectionHeader(title = "RAM & System Memory")
+        NivyaCard(borderColor = if (isLowRam) WarningAmber else OutlineDark) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${String.format("%.1f", usedRamGb)} GB used of ${String.format("%.1f", totalRamGb)} GB RAM",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = TextPrimary
+                )
+                Text(
+                    text = "${String.format("%.1f", memory?.usedPct ?: 51.2)}%",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (isLowRam) WarningAmber else SuccessGreen
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            LinearProgressIndicator(
+                progress = { ramProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp),
+                color = if (isLowRam) WarningAmber else SuccessGreen,
+                trackColor = SurfaceVariantDark
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = if (isLowRam) "System is experiencing low memory pressure." else "Memory headroom is healthy for multitasking.",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (isLowRam) WarningAmber else TextSecondary
+            )
+        }
+
+        // 5. Battery Snapshot
+        val batteryPct = health?.batteryPct ?: 82
+        val isCharging = health?.chargingState?.contains("CHARGING", ignoreCase = true) == true
+
+        SectionHeader(title = "Power & Battery Status")
+        NivyaCard {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Battery Level: $batteryPct%",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (isCharging) "⚡ Charging (${health?.chargingState})" else "Discharging (Unplugged)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isCharging) BlueLight else TextSecondary
+                    )
+                }
+                Text(
+                    text = "${health?.batteryTempCelsius ?: 31.5}°C",
+                    style = MaterialTheme.typography.titleSmall,
                     color = BlueLight
                 )
             }
         }
 
+        // 6. Permission Health Reporting
+        val perm = health?.permissionHealth
+        val allPermsHealthy = perm?.allHealthy ?: true
+
+        SectionHeader(title = "Permission Health Reporting")
+        if (!allPermsHealthy) {
+            NivyaCard(borderColor = WarningAmber) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = WarningAmber,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "One or more safety permissions require attention on the child's device.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = WarningAmber
+                    )
+                }
+            }
+        }
+
         NivyaCard {
-            Text(
-                text = "Internal Storage",
-                style = MaterialTheme.typography.titleSmall,
-                color = TextPrimary
-            )
-            Spacer(modifier = Modifier.height(6.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                PermissionStatusRow(
+                    name = "Location Access",
+                    status = perm?.locationPermission ?: "GRANTED",
+                    isHealthy = perm?.locationPermission?.contains("GRANTED") == true
+                )
+                HorizontalDivider(color = OutlineDark)
+                PermissionStatusRow(
+                    name = "Usage & Screen Time",
+                    status = perm?.usagePermission ?: "GRANTED",
+                    isHealthy = "GRANTED".equals(perm?.usagePermission, ignoreCase = true)
+                )
+                HorizontalDivider(color = OutlineDark)
+                PermissionStatusRow(
+                    name = "Safety Notifications",
+                    status = perm?.notificationPermission ?: "GRANTED",
+                    isHealthy = perm?.notificationPermission?.contains("GRANTED") == true
+                )
+                HorizontalDivider(color = OutlineDark)
+                PermissionStatusRow(
+                    name = "Battery Optimization",
+                    status = perm?.batteryOptimization ?: "OPTIMIZED",
+                    isHealthy = true
+                )
+            }
+        }
+
+        // 7. Connectivity & Telemetry Sync State
+        SectionHeader(title = "Connectivity & Synchronization")
+        NivyaCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "48.2 GB Used of 128 GB", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                Text(text = "38%", style = MaterialTheme.typography.bodySmall, color = BlueLight)
+                Column {
+                    Text(
+                        text = "Connection: ${health?.networkType ?: "WIFI"}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Sync State: ${health?.syncState ?: "SYNCED"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+                Text(
+                    text = if (health?.isOnline == true) "● Online" else "○ Offline",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (health?.isOnline == true) SuccessGreen else ErrorRed
+                )
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            LinearProgressIndicator(
-                progress = { 0.38f },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp),
-                color = BluePrimary,
-                trackColor = SurfaceVariantDark
+        }
+    }
+}
+
+@Composable
+private fun PermissionStatusRow(
+    name: String,
+    status: String,
+    isHealthy: Boolean
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = name, style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = if (isHealthy) Icons.Default.CheckCircle else Icons.Default.Warning,
+                contentDescription = null,
+                tint = if (isHealthy) SuccessGreen else WarningAmber,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = "$status • " + if (isHealthy) "Healthy" else "Action Needed",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (isHealthy) SuccessGreen else WarningAmber
             )
         }
     }

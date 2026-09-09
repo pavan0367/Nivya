@@ -17,4 +17,6 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
     List<Device> findByFamilyId(Long familyId);
 
     Optional<Device> findByUserIdAndPlatform(Long userId, String platform);
+
+    Optional<Device> findFirstByUserIdOrderByIdAsc(Long userId);
 }
