@@ -17,6 +17,8 @@ firebase-adminsdk.json
 target/
 *.class
 *.jar
+!**/gradle-wrapper.jar
+!gradle-wrapper.jar
 *.war
 *.ear
 *.nar
