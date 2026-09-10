@@ -9,6 +9,7 @@ import com.nivya.email.repository.EmailNotificationRepository;
 import com.nivya.email.repository.EmailPreferenceRepository;
 import com.nivya.email.repository.EmailVerificationCodeRepository;
 import com.nivya.user.entity.User;
+import com.nivya.user.entity.UserStatus;
 import com.nivya.user.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -127,6 +128,18 @@ public class EmailService {
 
         codeRecord.markUsed();
         verificationCodeRepository.save(codeRecord);
+
+        // Activate user account if in PENDING state
+        userRepository.findByEmail(normalizedEmail).ifPresent(user -> {
+            if (user.getStatus() == UserStatus.PENDING) {
+                user.setStatus(UserStatus.ACTIVE);
+                userRepository.save(user);
+                auditService.logEvent(user.getId(), "USER_STATUS_ACTIVATED",
+                        "Account activated after email verification for " + normalizedEmail, "SYSTEM");
+                log.info("Activated account for user ID: {}, email: {}", user.getId(), normalizedEmail);
+            }
+        });
+
         auditService.logEvent(codeRecord.getUser() != null ? codeRecord.getUser().getId() : null,
                 "EMAIL_VERIFY_SUCCESS", "Verification code verified successfully for " + normalizedEmail, "SYSTEM");
         return true;

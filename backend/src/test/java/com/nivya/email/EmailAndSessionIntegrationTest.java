@@ -10,6 +10,8 @@ import com.nivya.email.dto.EmailPreferenceDto;
 import com.nivya.email.dto.VerificationCodeRequest;
 import com.nivya.email.dto.VerificationConfirmRequest;
 import com.nivya.email.provider.*;
+import com.nivya.email.repository.EmailNotificationRepository;
+import com.nivya.email.repository.EmailVerificationCodeRepository;
 import com.nivya.email.service.EmailService;
 import com.nivya.pairing.dto.ConnectPairingRequest;
 import com.nivya.pairing.dto.GenerateDisconnectCodeResponse;
@@ -21,6 +23,7 @@ import com.nivya.role.RoleType;
 import com.nivya.session.dto.DeviceSessionDto;
 import com.nivya.session.service.DeviceSessionService;
 import com.nivya.user.entity.User;
+import com.nivya.user.entity.UserStatus;
 import com.nivya.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -56,6 +59,12 @@ public class EmailAndSessionIntegrationTest {
 
     @Autowired
     private EmailService emailService;
+
+    @Autowired
+    private EmailVerificationCodeRepository emailVerificationCodeRepository;
+
+    @Autowired
+    private EmailNotificationRepository notificationRepository;
 
     @Autowired
     private DeviceSessionService deviceSessionService;
@@ -126,6 +135,16 @@ public class EmailAndSessionIntegrationTest {
         );
         childToken = cAuth.getAccessToken();
         childUserId = cAuth.getUser().getId();
+
+        // Activate parent and child for downstream session tests
+        userRepository.findById(parentUserId).ifPresent(u -> {
+            u.setStatus(UserStatus.ACTIVE);
+            userRepository.save(u);
+        });
+        userRepository.findById(childUserId).ifPresent(u -> {
+            u.setStatus(UserStatus.ACTIVE);
+            userRepository.save(u);
+        });
 
         // 3. Pair them
         MvcResult codeRes = mockMvc.perform(post("/api/v1/pairing/code")
@@ -377,5 +396,56 @@ public class EmailAndSessionIntegrationTest {
         String historyJson = histRes.getResponse().getContentAsString();
         assertThat(historyJson).contains("Mom,here");
         assertThat(historyJson).contains("Someone's,here");
+    }
+
+    @Test
+    @DisplayName("Registration Email Verification: new registration is PENDING, generates code, and blocks login until activated")
+    void testRegistrationEmailVerificationAndLoginGate() throws Exception {
+        String uniqueSuffix = "reg_" + System.currentTimeMillis();
+        String testEmail = uniqueSuffix + "@nivya.local";
+        String password = "Password123!";
+
+        RegisterRequest req = new RegisterRequest();
+        req.setName("Unverified User");
+        req.setEmail(testEmail);
+        req.setPassword(password);
+        req.setRole(RoleType.PARENT);
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true));
+
+        // 1. Verify user status is PENDING in DB
+        User user = userRepository.findByEmail(testEmail).orElseThrow();
+        assertThat(user.getStatus()).isEqualTo(UserStatus.PENDING);
+
+        // 2. Verify verification code was generated in repository
+        var codeOpt = emailVerificationCodeRepository
+                .findFirstByEmailAndPurposeAndUsedAtIsNullOrderByCreatedAtDesc(testEmail, "EMAIL_VERIFICATION");
+        assertThat(codeOpt).isPresent();
+        assertThat(codeOpt.get().isUsed()).isFalse();
+
+        // 3. Attempting login before verification MUST be blocked
+        LoginRequest loginReq = new LoginRequest();
+        loginReq.setEmail(testEmail);
+        loginReq.setPassword(password);
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isUnauthorized());
+
+        // 4. Activate user via verification
+        user.setStatus(UserStatus.ACTIVE);
+        userRepository.save(user);
+
+        // 5. Login now succeeds
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
     }
 }

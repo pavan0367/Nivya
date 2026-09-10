@@ -52,17 +52,16 @@ export const RegisterPage: React.FC = () => {
       localStorage.removeItem('nivya_user_role');
       localStorage.removeItem('nivya_user');
 
-      setSuccessMessage('Account created successfully! Redirecting to sign in...');
+      setSuccessMessage('Account created! A verification code has been dispatched to your email.');
 
       setTimeout(() => {
-        navigate('/login', {
+        navigate(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}`, {
           replace: true,
           state: {
-            registeredEmail: email.trim().toLowerCase(),
-            successMessage: 'Account created successfully! Please sign in with your credentials.',
+            email: email.trim().toLowerCase(),
           },
         });
-      }, 1200);
+      }, 1000);
     } catch (err: any) {
       console.error('Registration failed:', err);
       const serverMessage = err.response?.data?.message;

@@ -24,7 +24,7 @@ export const RoleSelectPage: React.FC = () => {
       }
 
       if (selectedRole === 'PARENT') {
-        navigate('/dashboard');
+        navigate('/pairing');
       } else {
         navigate('/access-denied');
       }

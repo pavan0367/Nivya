@@ -8,7 +8,9 @@ import { RoleRoute } from './RoleRoute';
 // Pages
 import { LoginPage } from '../pages/Login/LoginPage';
 import { RegisterPage } from '../pages/Register/RegisterPage';
+import { VerifyEmailPage } from '../pages/VerifyEmail/VerifyEmailPage';
 import { RoleSelectPage } from '../pages/RoleSelection/RoleSelectPage';
+import { PairingScreen } from '../pages/Pairing/PairingScreen';
 import { AccessDeniedPage } from '../pages/AccessDeniedPage';
 import { DashboardPage } from '../pages/Dashboard/DashboardPage';
 import { LiveActivityPage } from '../pages/LiveActivity/LiveActivityPage';
@@ -27,6 +29,7 @@ export const AppRoutes: React.FC = () => {
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/role-selection" element={<RoleSelectPage />} />
       </Route>
 
@@ -36,6 +39,7 @@ export const AppRoutes: React.FC = () => {
       {/* Protected Parent-Only Routes */}
       <Route element={<ProtectedRoute />}>
         <Route element={<RoleRoute allowedRoles={['PARENT']} />}>
+          <Route path="/pairing" element={<PairingScreen />} />
           <Route element={<DashboardLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/live-activity" element={<LiveActivityPage />} />

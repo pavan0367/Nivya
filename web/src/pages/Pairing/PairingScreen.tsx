@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './PairingScreen.css';
 
 export interface DeviceStatusItem {
@@ -42,7 +43,8 @@ export const PairingScreen: React.FC<PairingScreenProps> = ({
   role,
   onPairingComplete
 }) => {
-  const currentRole = role || (localStorage.getItem('userRole') as 'PARENT' | 'CHILD') || 'PARENT';
+  const navigate = useNavigate();
+  const currentRole = role || (localStorage.getItem('nivya_user_role') as 'PARENT' | 'CHILD') || (localStorage.getItem('userRole') as 'PARENT' | 'CHILD') || 'PARENT';
   const oppositeRole = currentRole === 'PARENT' ? 'Child' : 'Parent';
 
   const [myCode, setMyCode] = useState<string>('');
@@ -70,7 +72,7 @@ export const PairingScreen: React.FC<PairingScreenProps> = ({
   }, [ttlSeconds]);
 
   const getAuthHeader = (): Record<string, string> => {
-    const token = localStorage.getItem('accessToken');
+    const token = localStorage.getItem('nivya_access_token') || localStorage.getItem('accessToken');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   };
 
@@ -166,9 +168,13 @@ export const PairingScreen: React.FC<PairingScreenProps> = ({
       }
 
       setPairingStatus(data.data);
+      localStorage.setItem('nivya_is_paired', 'true');
       if (onPairingComplete) {
         onPairingComplete();
       }
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1000);
     } catch (err: any) {
       setErrorMessage(err.message || 'Connection error. Check code and network.');
     } finally {
@@ -236,6 +242,20 @@ export const PairingScreen: React.FC<PairingScreenProps> = ({
                 ))}
               </div>
             )}
+
+            <button
+              type="button"
+              id="btn-goto-dashboard"
+              className="connect-btn"
+              style={{ marginTop: '16px', background: '#10b981', cursor: 'pointer' }}
+              onClick={() => {
+                localStorage.setItem('nivya_is_paired', 'true');
+                if (onPairingComplete) onPairingComplete();
+                navigate('/dashboard');
+              }}
+            >
+              Proceed to Dashboard →
+            </button>
           </div>
         )}
 

@@ -6,6 +6,7 @@ import com.nivya.auth.entity.RefreshToken;
 import com.nivya.auth.exception.DuplicateEmailException;
 import com.nivya.auth.exception.InvalidTokenException;
 import com.nivya.auth.repository.RefreshTokenRepository;
+import com.nivya.email.service.EmailService;
 import com.nivya.security.UserPrincipal;
 import com.nivya.security.jwt.JwtTokenProvider;
 import com.nivya.session.service.DeviceSessionService;
@@ -39,6 +40,7 @@ public class AuthService {
     private final AuthRateLimiter authRateLimiter;
     private final AuditService auditService;
     private final DeviceSessionService deviceSessionService;
+    private final EmailService emailService;
     private final long refreshTokenExpirationMs;
 
     public AuthService(
@@ -49,6 +51,7 @@ public class AuthService {
             AuthRateLimiter authRateLimiter,
             AuditService auditService,
             DeviceSessionService deviceSessionService,
+            EmailService emailService,
             @Value("${nivya.jwt.refresh-token-expiration-ms:604800000}") long refreshTokenExpirationMs) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
@@ -57,6 +60,7 @@ public class AuthService {
         this.authRateLimiter = authRateLimiter;
         this.auditService = auditService;
         this.deviceSessionService = deviceSessionService;
+        this.emailService = emailService;
         this.refreshTokenExpirationMs = refreshTokenExpirationMs;
     }
 
@@ -77,10 +81,18 @@ public class AuthService {
         String passwordHash = passwordEncoder.encode(request.getPassword());
         User user = new User(request.getName(), normalizedEmail, passwordHash, request.getRole());
         user.setPhone(request.getPhone());
+        user.setStatus(UserStatus.PENDING); // Verification required before full activation
         user = userRepository.save(user);
 
-        log.info("Registered new user with ID: {}, role: {}", user.getId(), user.getRole());
+        log.info("Registered new user with ID: {}, role: {}, status: PENDING", user.getId(), user.getRole());
         auditService.logEvent(user.getId(), "AUTH_REGISTER_SUCCESS", "Registered new user with role " + user.getRole(), ipAddress);
+
+        // Asynchronously generate and dispatch verification code via configured EmailProvider
+        try {
+            emailService.generateVerificationCode(user.getEmail(), "EMAIL_VERIFICATION", user);
+        } catch (Exception e) {
+            log.warn("Non-blocking failure initiating email verification for {}: {}", user.getEmail(), e.getMessage());
+        }
 
         UserPrincipal principal = UserPrincipal.create(user);
         String accessToken = tokenProvider.generateAccessToken(principal);
@@ -114,6 +126,11 @@ public class AuthService {
             authRateLimiter.recordFailedAttempt(ipAddress, normalizedEmail);
             auditService.logEvent(null, "AUTH_LOGIN_FAILED", "Invalid credentials for " + normalizedEmail, ipAddress);
             throw new BadCredentialsException("Invalid email or password");
+        }
+
+        if (user.getStatus() == UserStatus.PENDING) {
+            auditService.logEvent(user.getId(), "AUTH_LOGIN_BLOCKED", "Unverified account login attempt: " + normalizedEmail, ipAddress);
+            throw new BadCredentialsException("Account email is not verified. Please verify your email before logging in.");
         }
 
         if (user.getStatus() != UserStatus.ACTIVE) {
@@ -204,22 +221,35 @@ public class AuthService {
 
     @Transactional
     public void logout(String refreshTokenString, UserPrincipal principal, String ipAddress) {
+        User userToLogout = null;
+        String deviceFp = null;
+
         if (refreshTokenString != null && !refreshTokenString.isBlank()) {
-            refreshTokenRepository.findByTokenHash(refreshTokenString)
-                    .ifPresent(token -> {
-                        token.revoke();
-                        refreshTokenRepository.save(token);
-                    });
+            var tokenOpt = refreshTokenRepository.findByTokenHash(refreshTokenString);
+            if (tokenOpt.isPresent()) {
+                RefreshToken token = tokenOpt.get();
+                token.revoke();
+                refreshTokenRepository.save(token);
+                userToLogout = token.getUser();
+                deviceFp = token.getDeviceFingerprint();
+            }
         } else if (principal != null) {
             refreshTokenRepository.revokeAllUserTokens(principal.getId(), Instant.now());
         }
 
-        if (principal != null) {
-            userRepository.findById(principal.getId()).ifPresent(user ->
-                    deviceSessionService.recordLogout(user, refreshTokenString, ipAddress));
+        if (userToLogout == null && principal != null) {
+            userToLogout = userRepository.findById(principal.getId()).orElse(null);
         }
 
-        Long userId = principal != null ? principal.getId() : null;
+        if (userToLogout != null) {
+            try {
+                deviceSessionService.recordLogout(userToLogout, deviceFp, ipAddress);
+            } catch (Exception e) {
+                log.warn("Non-blocking failure recording logout session for {}: {}", userToLogout.getEmail(), e.getMessage());
+            }
+        }
+
+        Long userId = principal != null ? principal.getId() : (userToLogout != null ? userToLogout.getId() : null);
         auditService.logEvent(userId, "AUTH_LOGOUT", "User logged out", ipAddress);
     }
 

@@ -218,12 +218,9 @@ fun AppNavGraph(
                                     navController.navigate(destination) {
                                         popUpTo(NavigationDestination.Login.route) { inclusive = true }
                                     }
-                                } else if (roleStr.isNullOrBlank()) {
-                                    navController.navigate(NavigationDestination.RoleSelection.route) {
-                                        popUpTo(NavigationDestination.Login.route) { inclusive = true }
-                                    }
                                 } else {
-                                    navController.navigate("pairing/connection/$roleStr") {
+                                    // New / setup-incomplete user: Route to Role Selection
+                                    navController.navigate(NavigationDestination.RoleSelection.route) {
                                         popUpTo(NavigationDestination.Login.route) { inclusive = true }
                                     }
                                 }

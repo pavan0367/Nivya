@@ -47,6 +47,33 @@ export const authService = {
     }
   },
 
+  async getPairingStatus(): Promise<{ paired: boolean; familyId?: number; familyCode?: string; userRole?: RoleType }> {
+    const response = await apiClient.get<ApiResponse<{ paired: boolean; familyId?: number; familyCode?: string; userRole?: RoleType }>>('/pairing/status');
+    const data = response.data.data!;
+    if (data.paired) {
+      localStorage.setItem('nivya_is_paired', 'true');
+    } else {
+      localStorage.setItem('nivya_is_paired', 'false');
+    }
+    return data;
+  },
+
+  async verifyEmail(email: string, code: string, purpose: string = 'EMAIL_VERIFICATION'): Promise<boolean> {
+    const response = await apiClient.post<ApiResponse<{ verified: boolean }>>('/email/verify/confirm', {
+      email,
+      code,
+      purpose,
+    });
+    return !!response.data.data?.verified;
+  },
+
+  async sendVerificationCode(email: string, purpose: string = 'EMAIL_VERIFICATION'): Promise<void> {
+    await apiClient.post('/email/verify/send', {
+      email,
+      purpose,
+    });
+  },
+
   logout(): void {
     const refreshToken = localStorage.getItem('nivya_refresh_token');
     if (refreshToken) {
@@ -56,6 +83,7 @@ export const authService = {
     localStorage.removeItem('nivya_refresh_token');
     localStorage.removeItem('nivya_user_role');
     localStorage.removeItem('nivya_user');
+    // Note: Do not remove nivya_is_paired on logout so relogin recognizes already paired device
     window.location.href = '/login';
   },
 
@@ -74,5 +102,13 @@ export const authService = {
 
   isParent(): boolean {
     return this.getUserRole() === 'PARENT';
+  },
+
+  isPaired(): boolean {
+    return localStorage.getItem('nivya_is_paired') === 'true';
+  },
+
+  setPaired(paired: boolean): void {
+    localStorage.setItem('nivya_is_paired', paired ? 'true' : 'false');
   },
 };

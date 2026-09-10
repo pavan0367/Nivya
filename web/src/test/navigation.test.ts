@@ -46,11 +46,12 @@ describe('Navigation and Parent Route Isolation', () => {
   });
 
   it('ensures public auth routes allow access without parent credentials', () => {
-    const publicRoutes = ['/login', '/register', '/role-selection', '/access-denied'];
+    const publicRoutes = ['/login', '/register', '/verify-email', '/role-selection', '/access-denied'];
     const isPublicRoute = (path: string) => publicRoutes.includes(path);
 
     expect(isPublicRoute('/login')).toBe(true);
     expect(isPublicRoute('/register')).toBe(true);
+    expect(isPublicRoute('/verify-email')).toBe(true);
     expect(isPublicRoute('/role-selection')).toBe(true);
     expect(isPublicRoute('/access-denied')).toBe(true);
     expect(isPublicRoute('/dashboard')).toBe(false);

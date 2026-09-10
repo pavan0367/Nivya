@@ -11,6 +11,7 @@ export const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>((location.state as any)?.successMessage || null);
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
 
   useEffect(() => {
     if ((location.state as any)?.registeredEmail) {
@@ -30,22 +31,45 @@ export const LoginPage: React.FC = () => {
 
     setLoading(true);
     setError(null);
+    setUnverifiedEmail(null);
 
     try {
       const data = await authService.login(email, password);
-      if (data.user.role === 'PARENT') {
-        const origin = (location.state as any)?.from?.pathname || '/dashboard';
-        navigate(origin, { replace: true });
-      } else {
-        // Child user logged in
+
+      if (data.user.role !== 'PARENT') {
         navigate('/access-denied', { replace: true });
+        return;
+      }
+
+      // Check pairing / relationship state to differentiate First-Time vs Already-Paired
+      try {
+        const pairingStatus = await authService.getPairingStatus();
+        if (pairingStatus.paired) {
+          // ALREADY PAIRED USER: Direct to dashboard
+          const origin = (location.state as any)?.from?.pathname || '/dashboard';
+          navigate(origin, { replace: true });
+        } else {
+          // FIRST-TIME / SETUP-INCOMPLETE USER: Route to Role Selection
+          navigate('/role-selection', { replace: true });
+        }
+      } catch (pairErr) {
+        console.warn('Could not determine live pairing status; checking local state:', pairErr);
+        // TEMPORARILY OFFLINE: If previously paired, preserve dashboard access
+        if (authService.isPaired()) {
+          navigate('/dashboard', { replace: true });
+        } else {
+          navigate('/role-selection', { replace: true });
+        }
       }
     } catch (err: any) {
       console.error('Login failed:', err);
-      setError(
-        err.response?.data?.message ||
-        'Authentication failed. Please check your credentials and try again.'
-      );
+      const serverMsg = err.response?.data?.message ||
+        'Authentication failed. Please check your credentials and try again.';
+      setError(serverMsg);
+
+      if (serverMsg.toLowerCase().includes('not verified') || serverMsg.toLowerCase().includes('verify your email')) {
+        setUnverifiedEmail(email.trim().toLowerCase());
+      }
     } finally {
       setLoading(false);
     }
@@ -106,7 +130,18 @@ export const LoginPage: React.FC = () => {
           }}
         >
           <AlertCircle size={18} style={{ flexShrink: 0 }} />
-          <span>{error}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <span>{error}</span>
+            {unverifiedEmail && (
+              <Link
+                to={`/verify-email?email=${encodeURIComponent(unverifiedEmail)}`}
+                id="link-verify-unverified"
+                style={{ color: '#fff', fontWeight: 600, textDecoration: 'underline', fontSize: '0.82rem' }}
+              >
+                Click here to verify your email address →
+              </Link>
+            )}
+          </div>
         </div>
       )}
 
