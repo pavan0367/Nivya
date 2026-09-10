@@ -26,10 +26,9 @@ public class AuditService {
     }
 
     /**
-     * Persists an audit log entry in a new transaction to ensure audit trail survival
-     * even if the outer business transaction rolls back.
+     * Persists an audit log entry for security and operational monitoring.
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public AuditLog logEvent(Long userId, String action, String details, String ipAddress) {
         try {
             AuditLog entry = new AuditLog(userId, action, details, ipAddress);

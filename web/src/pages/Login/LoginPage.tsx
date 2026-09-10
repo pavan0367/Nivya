@@ -1,15 +1,25 @@
-import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { Lock, Mail, ArrowRight, AlertCircle, CheckCircle } from 'lucide-react';
 import { authService } from '../../services/authService';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState((location.state as any)?.registeredEmail || '');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>((location.state as any)?.successMessage || null);
+
+  useEffect(() => {
+    if ((location.state as any)?.registeredEmail) {
+      setEmail((location.state as any).registeredEmail);
+    }
+    if ((location.state as any)?.successMessage) {
+      setNotice((location.state as any).successMessage);
+    }
+  }, [location.state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,8 +68,30 @@ export const LoginPage: React.FC = () => {
         </p>
       </div>
 
+      {notice && (
+        <div
+          id="login-notice-alert"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.65rem',
+            padding: '0.85rem 1rem',
+            borderRadius: 'var(--radius-md)',
+            background: 'rgba(16, 185, 129, 0.12)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            color: 'var(--success)',
+            fontSize: '0.85rem',
+            marginBottom: '1.5rem',
+          }}
+        >
+          <CheckCircle size={18} style={{ flexShrink: 0 }} />
+          <span>{notice}</span>
+        </div>
+      )}
+
       {error && (
         <div
+          id="login-error-alert"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -147,6 +179,18 @@ export const LoginPage: React.FC = () => {
             </>
           )}
         </button>
+
+        {/* Link to Register */}
+        <div style={{ marginTop: '0.5rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+          Don't have an account?{' '}
+          <Link
+            to="/register"
+            id="link-to-register"
+            style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}
+          >
+            Create Account
+          </Link>
+        </div>
       </form>
     </div>
   );

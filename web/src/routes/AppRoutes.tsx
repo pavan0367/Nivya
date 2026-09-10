@@ -7,6 +7,7 @@ import { RoleRoute } from './RoleRoute';
 
 // Pages
 import { LoginPage } from '../pages/Login/LoginPage';
+import { RegisterPage } from '../pages/Register/RegisterPage';
 import { RoleSelectPage } from '../pages/RoleSelection/RoleSelectPage';
 import { AccessDeniedPage } from '../pages/AccessDeniedPage';
 import { DashboardPage } from '../pages/Dashboard/DashboardPage';
@@ -25,6 +26,7 @@ export const AppRoutes: React.FC = () => {
       {/* Public Auth Routes */}
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
         <Route path="/role-selection" element={<RoleSelectPage />} />
       </Route>
 

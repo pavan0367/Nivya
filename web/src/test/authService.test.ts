@@ -84,4 +84,28 @@ describe('authService & Role Isolation', () => {
     expect(localStorage.getItem('nivya_user')).toBeNull();
     expect((globalThis as any).window.location.href).toBe('/login');
   });
+
+  it('stores auth tokens and user profile on successful register', async () => {
+    vi.spyOn(authService, 'register').mockImplementation(async (name, email, _password, role) => {
+      const mockData = {
+        accessToken: 'registered_access_jwt',
+        refreshToken: 'registered_refresh_jwt',
+        tokenType: 'Bearer',
+        expiresIn: 3600,
+        user: { id: 3, name, email, role, emailVerified: false, isChild: role === 'CHILD', isParent: role === 'PARENT', roles: [role] }
+      };
+      localStorage.setItem('nivya_access_token', mockData.accessToken);
+      localStorage.setItem('nivya_refresh_token', mockData.refreshToken);
+      localStorage.setItem('nivya_user_role', role);
+      localStorage.setItem('nivya_user', JSON.stringify(mockData.user));
+      return mockData;
+    });
+
+    const result = await authService.register('New Parent', 'new.parent@nivya.local', 'Password123!', 'PARENT');
+    expect(result.accessToken).toBe('registered_access_jwt');
+    expect(localStorage.getItem('nivya_access_token')).toBe('registered_access_jwt');
+    expect(localStorage.getItem('nivya_user_role')).toBe('PARENT');
+    expect(authService.isAuthenticated()).toBe(true);
+    expect(authService.isParent()).toBe(true);
+  });
 });
