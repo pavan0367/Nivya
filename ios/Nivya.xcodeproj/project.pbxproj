@@ -7,31 +7,105 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A10000012C8D000100000001 /* NivyaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000022C8D000100000001 /* NivyaApp.swift */; };
-		A10000032C8D000100000001 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000042C8D000100000001 /* AppState.swift */; };
-		A10000052C8D000100000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000062C8D000100000001 /* Assets.xcassets */; };
-		A10000072C8D000100000001 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = A10000082C8D000100000001 /* LaunchScreen.storyboard */; };
-		B10000012C8D000100000001 /* AuthenticationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000022C8D000100000001 /* AuthenticationTests.swift */; };
-		B10000032C8D000100000001 /* PairingAndReloginTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000042C8D000100000001 /* PairingAndReloginTests.swift */; };
-		B10000052C8D000100000001 /* ProtectedDisconnectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000062C8D000100000001 /* ProtectedDisconnectTests.swift */; };
-		B10000072C8D000100000001 /* CrackFreakTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000082C8D000100000001 /* CrackFreakTests.swift */; };
-		B10000092C8D000100000001 /* ChildDashboardOrderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000102C8D000100000001 /* ChildDashboardOrderTests.swift */; };
-		B10000112C8D000100000001 /* CrossPlatformParentIPhoneChildAndroidTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000122C8D000100000001 /* CrossPlatformParentIPhoneChildAndroidTests.swift */; };
+		B10000682C8D000100000001 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000672C8D000100000001 /* AppState.swift */; };
+		B100006A2C8D000100000001 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F10000692C8D000100000001 /* LaunchScreen.storyboard */; };
+		B100006C2C8D000100000001 /* NivyaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100006B2C8D000100000001 /* NivyaApp.swift */; };
+		B10000702C8D000100000001 /* APIEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100006F2C8D000100000001 /* APIEndpoint.swift */; };
+		B10000722C8D000100000001 /* NetworkClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000712C8D000100000001 /* NetworkClient.swift */; };
+		B10000742C8D000100000001 /* NetworkError.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000732C8D000100000001 /* NetworkError.swift */; };
+		B10000762C8D000100000001 /* WebSocketClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000752C8D000100000001 /* WebSocketClient.swift */; };
+		B10000792C8D000100000001 /* PermissionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000782C8D000100000001 /* PermissionManager.swift */; };
+		B100007C2C8D000100000001 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100007B2C8D000100000001 /* KeychainManager.swift */; };
+		B100007F2C8D000100000001 /* AppPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100007E2C8D000100000001 /* AppPreferences.swift */; };
+		B10000822C8D000100000001 /* NivyaColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000812C8D000100000001 /* NivyaColors.swift */; };
+		B10000862C8D000100000001 /* AuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000852C8D000100000001 /* AuthModels.swift */; };
+		B10000882C8D000100000001 /* ConvocationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000872C8D000100000001 /* ConvocationModels.swift */; };
+		B100008A2C8D000100000001 /* PairingModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000892C8D000100000001 /* PairingModels.swift */; };
+		B100008C2C8D000100000001 /* SessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100008B2C8D000100000001 /* SessionModels.swift */; };
+		B100008E2C8D000100000001 /* TelemetryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100008D2C8D000100000001 /* TelemetryModels.swift */; };
+		B10000912C8D000100000001 /* AuthRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000902C8D000100000001 /* AuthRepository.swift */; };
+		B10000932C8D000100000001 /* ConvocationRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000922C8D000100000001 /* ConvocationRepository.swift */; };
+		B10000952C8D000100000001 /* PairingRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000942C8D000100000001 /* PairingRepository.swift */; };
+		B10000972C8D000100000001 /* SessionRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000962C8D000100000001 /* SessionRepository.swift */; };
+		B10000992C8D000100000001 /* TelemetryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000982C8D000100000001 /* TelemetryRepository.swift */; };
+		B100009D2C8D000100000001 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100009C2C8D000100000001 /* LoginView.swift */; };
+		B100009F2C8D000100000001 /* RegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100009E2C8D000100000001 /* RegisterView.swift */; };
+		B10000A22C8D000100000001 /* ChildDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000A12C8D000100000001 /* ChildDashboardView.swift */; };
+		B10000A52C8D000100000001 /* ConvocationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000A42C8D000100000001 /* ConvocationView.swift */; };
+		B10000A82C8D000100000001 /* ChildPairingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000A72C8D000100000001 /* ChildPairingView.swift */; };
+		B10000AA2C8D000100000001 /* ParentPairingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000A92C8D000100000001 /* ParentPairingView.swift */; };
+		B10000AD2C8D000100000001 /* ParentDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000AC2C8D000100000001 /* ParentDashboardView.swift */; };
+		B10000B02C8D000100000001 /* RoleSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000AF2C8D000100000001 /* RoleSelectionView.swift */; };
+		B10000B32C8D000100000001 /* ChildSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000B22C8D000100000001 /* ChildSettingsView.swift */; };
+		B10000B52C8D000100000001 /* ParentSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000B42C8D000100000001 /* ParentSettingsView.swift */; };
+		B10000B72C8D000100000001 /* ProtectedDisconnectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000B62C8D000100000001 /* ProtectedDisconnectView.swift */; };
+		B10000B92C8D000100000001 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000B82C8D000100000001 /* SettingsView.swift */; };
+		B10000BC2C8D000100000001 /* SplashScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000BB2C8D000100000001 /* SplashScreenView.swift */; };
+		B10000BF2C8D000100000001 /* BatteryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000BE2C8D000100000001 /* BatteryService.swift */; };
+		B10000C12C8D000100000001 /* DeviceHealthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000C02C8D000100000001 /* DeviceHealthService.swift */; };
+		B10000C32C8D000100000001 /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000C22C8D000100000001 /* LocationService.swift */; };
+		B10000C52C8D000100000001 /* NetworkMonitoringService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000C42C8D000100000001 /* NetworkMonitoringService.swift */; };
+		B10000C72C8D000100000001 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000C62C8D000100000001 /* NotificationService.swift */; };
+		B10000C92C8D000100000001 /* TelemetrySyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000C82C8D000100000001 /* TelemetrySyncService.swift */; };
+		B10000CC2C8D000100000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F10000CB2C8D000100000001 /* Assets.xcassets */; };
+		B10000D02C8D000100000001 /* AuthenticationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000CF2C8D000100000001 /* AuthenticationTests.swift */; };
+		B10000D22C8D000100000001 /* ChildDashboardOrderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000D12C8D000100000001 /* ChildDashboardOrderTests.swift */; };
+		B10000D42C8D000100000001 /* CrackFreakTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000D32C8D000100000001 /* CrackFreakTests.swift */; };
+		B10000D62C8D000100000001 /* CrossPlatformParentIPhoneChildAndroidTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000D52C8D000100000001 /* CrossPlatformParentIPhoneChildAndroidTests.swift */; };
+		B10000D82C8D000100000001 /* PairingAndReloginTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000D72C8D000100000001 /* PairingAndReloginTests.swift */; };
+		B10000DA2C8D000100000001 /* ProtectedDisconnectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000D92C8D000100000001 /* ProtectedDisconnectTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A10000022C8D000100000001 /* NivyaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NivyaApp.swift; sourceTree = "<group>"; };
-		A10000042C8D000100000001 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
-		A10000062C8D000100000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		A10000082C8D000100000001 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
-		A10000092C8D000100000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F10000672C8D000100000001 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		F10000692C8D000100000001 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		F100006B2C8D000100000001 /* NivyaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NivyaApp.swift; sourceTree = "<group>"; };
+		F100006F2C8D000100000001 /* APIEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIEndpoint.swift; sourceTree = "<group>"; };
+		F10000712C8D000100000001 /* NetworkClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkClient.swift; sourceTree = "<group>"; };
+		F10000732C8D000100000001 /* NetworkError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkError.swift; sourceTree = "<group>"; };
+		F10000752C8D000100000001 /* WebSocketClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketClient.swift; sourceTree = "<group>"; };
+		F10000782C8D000100000001 /* PermissionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionManager.swift; sourceTree = "<group>"; };
+		F100007B2C8D000100000001 /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
+		F100007E2C8D000100000001 /* AppPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferences.swift; sourceTree = "<group>"; };
+		F10000812C8D000100000001 /* NivyaColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NivyaColors.swift; sourceTree = "<group>"; };
+		F10000852C8D000100000001 /* AuthModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthModels.swift; sourceTree = "<group>"; };
+		F10000872C8D000100000001 /* ConvocationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvocationModels.swift; sourceTree = "<group>"; };
+		F10000892C8D000100000001 /* PairingModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingModels.swift; sourceTree = "<group>"; };
+		F100008B2C8D000100000001 /* SessionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionModels.swift; sourceTree = "<group>"; };
+		F100008D2C8D000100000001 /* TelemetryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryModels.swift; sourceTree = "<group>"; };
+		F10000902C8D000100000001 /* AuthRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthRepository.swift; sourceTree = "<group>"; };
+		F10000922C8D000100000001 /* ConvocationRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvocationRepository.swift; sourceTree = "<group>"; };
+		F10000942C8D000100000001 /* PairingRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingRepository.swift; sourceTree = "<group>"; };
+		F10000962C8D000100000001 /* SessionRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRepository.swift; sourceTree = "<group>"; };
+		F10000982C8D000100000001 /* TelemetryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryRepository.swift; sourceTree = "<group>"; };
+		F100009C2C8D000100000001 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		F100009E2C8D000100000001 /* RegisterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegisterView.swift; sourceTree = "<group>"; };
+		F10000A12C8D000100000001 /* ChildDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChildDashboardView.swift; sourceTree = "<group>"; };
+		F10000A42C8D000100000001 /* ConvocationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvocationView.swift; sourceTree = "<group>"; };
+		F10000A72C8D000100000001 /* ChildPairingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChildPairingView.swift; sourceTree = "<group>"; };
+		F10000A92C8D000100000001 /* ParentPairingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParentPairingView.swift; sourceTree = "<group>"; };
+		F10000AC2C8D000100000001 /* ParentDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParentDashboardView.swift; sourceTree = "<group>"; };
+		F10000AF2C8D000100000001 /* RoleSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleSelectionView.swift; sourceTree = "<group>"; };
+		F10000B22C8D000100000001 /* ChildSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChildSettingsView.swift; sourceTree = "<group>"; };
+		F10000B42C8D000100000001 /* ParentSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParentSettingsView.swift; sourceTree = "<group>"; };
+		F10000B62C8D000100000001 /* ProtectedDisconnectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectedDisconnectView.swift; sourceTree = "<group>"; };
+		F10000B82C8D000100000001 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		F10000BB2C8D000100000001 /* SplashScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashScreenView.swift; sourceTree = "<group>"; };
+		F10000BE2C8D000100000001 /* BatteryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryService.swift; sourceTree = "<group>"; };
+		F10000C02C8D000100000001 /* DeviceHealthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceHealthService.swift; sourceTree = "<group>"; };
+		F10000C22C8D000100000001 /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
+		F10000C42C8D000100000001 /* NetworkMonitoringService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitoringService.swift; sourceTree = "<group>"; };
+		F10000C62C8D000100000001 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		F10000C82C8D000100000001 /* TelemetrySyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetrySyncService.swift; sourceTree = "<group>"; };
+		F10000CB2C8D000100000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F10000CD2C8D000100000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F10000CF2C8D000100000001 /* AuthenticationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationTests.swift; sourceTree = "<group>"; };
+		F10000D12C8D000100000001 /* ChildDashboardOrderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChildDashboardOrderTests.swift; sourceTree = "<group>"; };
+		F10000D32C8D000100000001 /* CrackFreakTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrackFreakTests.swift; sourceTree = "<group>"; };
+		F10000D52C8D000100000001 /* CrossPlatformParentIPhoneChildAndroidTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossPlatformParentIPhoneChildAndroidTests.swift; sourceTree = "<group>"; };
+		F10000D72C8D000100000001 /* PairingAndReloginTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingAndReloginTests.swift; sourceTree = "<group>"; };
+		F10000D92C8D000100000001 /* ProtectedDisconnectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectedDisconnectTests.swift; sourceTree = "<group>"; };
 		A10000102C8D000100000001 /* Nivya.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nivya.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		B10000022C8D000100000001 /* AuthenticationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationTests.swift; sourceTree = "<group>"; };
-		B10000042C8D000100000001 /* PairingAndReloginTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingAndReloginTests.swift; sourceTree = "<group>"; };
-		B10000062C8D000100000001 /* ProtectedDisconnectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectedDisconnectTests.swift; sourceTree = "<group>"; };
-		B10000082C8D000100000001 /* CrackFreakTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrackFreakTests.swift; sourceTree = "<group>"; };
-		B10000102C8D000100000001 /* ChildDashboardOrderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChildDashboardOrderTests.swift; sourceTree = "<group>"; };
-		B10000122C8D000100000001 /* CrossPlatformParentIPhoneChildAndroidTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossPlatformParentIPhoneChildAndroidTests.swift; sourceTree = "<group>"; };
 		B10000202C8D000100000001 /* NivyaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NivyaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -53,47 +127,230 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		A10000122C8D000100000001 = {
+		G10000662C8D000100000001 /* App */ = {
 			isa = PBXGroup;
 			children = (
-				A10000132C8D000100000001 /* Nivya */,
-				B10000222C8D000100000001 /* NivyaTests */,
-				A10000142C8D000100000001 /* Products */,
+				F10000672C8D000100000001 /* AppState.swift */,
+				F10000692C8D000100000001 /* LaunchScreen.storyboard */,
+				F100006B2C8D000100000001 /* NivyaApp.swift */,
 			);
-			sourceTree = "<group>";
+			path = App; sourceTree = "<group>";
 		};
-		A10000132C8D000100000001 /* Nivya */ = {
+		G100006E2C8D000100000001 /* Network */ = {
 			isa = PBXGroup;
 			children = (
-				A10000022C8D000100000001 /* NivyaApp.swift */,
-				A10000042C8D000100000001 /* AppState.swift */,
-				A10000062C8D000100000001 /* Assets.xcassets */,
-				A10000082C8D000100000001 /* LaunchScreen.storyboard */,
-				A10000092C8D000100000001 /* Info.plist */,
+				F100006F2C8D000100000001 /* APIEndpoint.swift */,
+				F10000712C8D000100000001 /* NetworkClient.swift */,
+				F10000732C8D000100000001 /* NetworkError.swift */,
+				F10000752C8D000100000001 /* WebSocketClient.swift */,
 			);
-			path = Nivya;
-			sourceTree = "<group>";
+			path = Network; sourceTree = "<group>";
 		};
-		B10000222C8D000100000001 /* NivyaTests */ = {
+		G10000772C8D000100000001 /* Permissions */ = {
 			isa = PBXGroup;
 			children = (
-				B10000022C8D000100000001 /* AuthenticationTests.swift */,
-				B10000042C8D000100000001 /* PairingAndReloginTests.swift */,
-				B10000062C8D000100000001 /* ProtectedDisconnectTests.swift */,
-				B10000082C8D000100000001 /* CrackFreakTests.swift */,
-				B10000102C8D000100000001 /* ChildDashboardOrderTests.swift */,
-				B10000122C8D000100000001 /* CrossPlatformParentIPhoneChildAndroidTests.swift */,
+				F10000782C8D000100000001 /* PermissionManager.swift */,
+			);
+			path = Permissions; sourceTree = "<group>";
+		};
+		G100007A2C8D000100000001 /* Security */ = {
+			isa = PBXGroup;
+			children = (
+				F100007B2C8D000100000001 /* KeychainManager.swift */,
+			);
+			path = Security; sourceTree = "<group>";
+		};
+		G100007D2C8D000100000001 /* Storage */ = {
+			isa = PBXGroup;
+			children = (
+				F100007E2C8D000100000001 /* AppPreferences.swift */,
+			);
+			path = Storage; sourceTree = "<group>";
+		};
+		G10000802C8D000100000001 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				F10000812C8D000100000001 /* NivyaColors.swift */,
+			);
+			path = Theme; sourceTree = "<group>";
+		};
+		G100006D2C8D000100000001 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				G100006E2C8D000100000001 /* Network */,
+				G10000772C8D000100000001 /* Permissions */,
+				G100007A2C8D000100000001 /* Security */,
+				G100007D2C8D000100000001 /* Storage */,
+				G10000802C8D000100000001 /* Theme */,
+			);
+			path = Core; sourceTree = "<group>";
+		};
+		G10000842C8D000100000001 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				F10000852C8D000100000001 /* AuthModels.swift */,
+				F10000872C8D000100000001 /* ConvocationModels.swift */,
+				F10000892C8D000100000001 /* PairingModels.swift */,
+				F100008B2C8D000100000001 /* SessionModels.swift */,
+				F100008D2C8D000100000001 /* TelemetryModels.swift */,
+			);
+			path = Models; sourceTree = "<group>";
+		};
+		G100008F2C8D000100000001 /* Repositories */ = {
+			isa = PBXGroup;
+			children = (
+				F10000902C8D000100000001 /* AuthRepository.swift */,
+				F10000922C8D000100000001 /* ConvocationRepository.swift */,
+				F10000942C8D000100000001 /* PairingRepository.swift */,
+				F10000962C8D000100000001 /* SessionRepository.swift */,
+				F10000982C8D000100000001 /* TelemetryRepository.swift */,
+			);
+			path = Repositories; sourceTree = "<group>";
+		};
+		G10000832C8D000100000001 /* Data */ = {
+			isa = PBXGroup;
+			children = (
+				G10000842C8D000100000001 /* Models */,
+				G100008F2C8D000100000001 /* Repositories */,
+			);
+			path = Data; sourceTree = "<group>";
+		};
+		G100009B2C8D000100000001 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				F100009C2C8D000100000001 /* LoginView.swift */,
+				F100009E2C8D000100000001 /* RegisterView.swift */,
+			);
+			path = Auth; sourceTree = "<group>";
+		};
+		G10000A02C8D000100000001 /* ChildDashboard */ = {
+			isa = PBXGroup;
+			children = (
+				F10000A12C8D000100000001 /* ChildDashboardView.swift */,
+			);
+			path = ChildDashboard; sourceTree = "<group>";
+		};
+		G10000A32C8D000100000001 /* Convocation */ = {
+			isa = PBXGroup;
+			children = (
+				F10000A42C8D000100000001 /* ConvocationView.swift */,
+			);
+			path = Convocation; sourceTree = "<group>";
+		};
+		G10000A62C8D000100000001 /* Pairing */ = {
+			isa = PBXGroup;
+			children = (
+				F10000A72C8D000100000001 /* ChildPairingView.swift */,
+				F10000A92C8D000100000001 /* ParentPairingView.swift */,
+			);
+			path = Pairing; sourceTree = "<group>";
+		};
+		G10000AB2C8D000100000001 /* ParentDashboard */ = {
+			isa = PBXGroup;
+			children = (
+				F10000AC2C8D000100000001 /* ParentDashboardView.swift */,
+			);
+			path = ParentDashboard; sourceTree = "<group>";
+		};
+		G10000AE2C8D000100000001 /* Role */ = {
+			isa = PBXGroup;
+			children = (
+				F10000AF2C8D000100000001 /* RoleSelectionView.swift */,
+			);
+			path = Role; sourceTree = "<group>";
+		};
+		G10000B12C8D000100000001 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				F10000B22C8D000100000001 /* ChildSettingsView.swift */,
+				F10000B42C8D000100000001 /* ParentSettingsView.swift */,
+				F10000B62C8D000100000001 /* ProtectedDisconnectView.swift */,
+				F10000B82C8D000100000001 /* SettingsView.swift */,
+			);
+			path = Settings; sourceTree = "<group>";
+		};
+		G10000BA2C8D000100000001 /* Splash */ = {
+			isa = PBXGroup;
+			children = (
+				F10000BB2C8D000100000001 /* SplashScreenView.swift */,
+			);
+			path = Splash; sourceTree = "<group>";
+		};
+		G100009A2C8D000100000001 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				G100009B2C8D000100000001 /* Auth */,
+				G10000A02C8D000100000001 /* ChildDashboard */,
+				G10000A32C8D000100000001 /* Convocation */,
+				G10000A62C8D000100000001 /* Pairing */,
+				G10000AB2C8D000100000001 /* ParentDashboard */,
+				G10000AE2C8D000100000001 /* Role */,
+				G10000B12C8D000100000001 /* Settings */,
+				G10000BA2C8D000100000001 /* Splash */,
+			);
+			path = Features; sourceTree = "<group>";
+		};
+		G10000BD2C8D000100000001 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				F10000BE2C8D000100000001 /* BatteryService.swift */,
+				F10000C02C8D000100000001 /* DeviceHealthService.swift */,
+				F10000C22C8D000100000001 /* LocationService.swift */,
+				F10000C42C8D000100000001 /* NetworkMonitoringService.swift */,
+				F10000C62C8D000100000001 /* NotificationService.swift */,
+				F10000C82C8D000100000001 /* TelemetrySyncService.swift */,
+			);
+			path = Services; sourceTree = "<group>";
+		};
+		G10000CA2C8D000100000001 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				F10000CB2C8D000100000001 /* Assets.xcassets */,
+				F10000CD2C8D000100000001 /* Info.plist */,
+			);
+			path = Resources; sourceTree = "<group>";
+		};
+		G10000652C8D000100000001 /* Nivya */ = {
+			isa = PBXGroup;
+			children = (
+				G10000662C8D000100000001 /* App */,
+				G100006D2C8D000100000001 /* Core */,
+				G10000832C8D000100000001 /* Data */,
+				G100009A2C8D000100000001 /* Features */,
+				G10000BD2C8D000100000001 /* Services */,
+				G10000CA2C8D000100000001 /* Resources */,
+			);
+			path = Nivya; sourceTree = "<group>";
+		};
+		G10000CE2C8D000100000001 /* NivyaTests */ = {
+			isa = PBXGroup;
+			children = (
+				F10000CF2C8D000100000001 /* AuthenticationTests.swift */,
+				F10000D12C8D000100000001 /* ChildDashboardOrderTests.swift */,
+				F10000D32C8D000100000001 /* CrackFreakTests.swift */,
+				F10000D52C8D000100000001 /* CrossPlatformParentIPhoneChildAndroidTests.swift */,
+				F10000D72C8D000100000001 /* PairingAndReloginTests.swift */,
+				F10000D92C8D000100000001 /* ProtectedDisconnectTests.swift */,
 			);
 			path = NivyaTests;
 			sourceTree = "<group>";
 		};
-		A10000142C8D000100000001 /* Products */ = {
+		G10000DB2C8D000100000001 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				A10000102C8D000100000001 /* Nivya.app */,
 				B10000202C8D000100000001 /* NivyaTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A10000122C8D000100000001 = {
+			isa = PBXGroup;
+			children = (
+				G10000652C8D000100000001 /* Nivya */,
+				G10000CE2C8D000100000001 /* NivyaTests */,
+				G10000DB2C8D000100000001 /* Products */,
+			);
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -160,7 +417,7 @@
 				Base,
 			);
 			mainGroup = A10000122C8D000100000001;
-			productRefGroup = A10000142C8D000100000001 /* Products */;
+			productRefGroup = G10000DB2C8D000100000001 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -175,8 +432,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000052C8D000100000001 /* Assets.xcassets in Resources */,
-				A10000072C8D000100000001 /* LaunchScreen.storyboard in Resources */,
+				B100006A2C8D000100000001 /* LaunchScreen.storyboard in Resources */,
+				B10000CC2C8D000100000001 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -187,8 +444,45 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000012C8D000100000001 /* NivyaApp.swift in Sources */,
-				A10000032C8D000100000001 /* AppState.swift in Sources */,
+				B10000682C8D000100000001 /* AppState.swift in Sources */,
+				B100006C2C8D000100000001 /* NivyaApp.swift in Sources */,
+				B10000702C8D000100000001 /* APIEndpoint.swift in Sources */,
+				B10000722C8D000100000001 /* NetworkClient.swift in Sources */,
+				B10000742C8D000100000001 /* NetworkError.swift in Sources */,
+				B10000762C8D000100000001 /* WebSocketClient.swift in Sources */,
+				B10000792C8D000100000001 /* PermissionManager.swift in Sources */,
+				B100007C2C8D000100000001 /* KeychainManager.swift in Sources */,
+				B100007F2C8D000100000001 /* AppPreferences.swift in Sources */,
+				B10000822C8D000100000001 /* NivyaColors.swift in Sources */,
+				B10000862C8D000100000001 /* AuthModels.swift in Sources */,
+				B10000882C8D000100000001 /* ConvocationModels.swift in Sources */,
+				B100008A2C8D000100000001 /* PairingModels.swift in Sources */,
+				B100008C2C8D000100000001 /* SessionModels.swift in Sources */,
+				B100008E2C8D000100000001 /* TelemetryModels.swift in Sources */,
+				B10000912C8D000100000001 /* AuthRepository.swift in Sources */,
+				B10000932C8D000100000001 /* ConvocationRepository.swift in Sources */,
+				B10000952C8D000100000001 /* PairingRepository.swift in Sources */,
+				B10000972C8D000100000001 /* SessionRepository.swift in Sources */,
+				B10000992C8D000100000001 /* TelemetryRepository.swift in Sources */,
+				B100009D2C8D000100000001 /* LoginView.swift in Sources */,
+				B100009F2C8D000100000001 /* RegisterView.swift in Sources */,
+				B10000A22C8D000100000001 /* ChildDashboardView.swift in Sources */,
+				B10000A52C8D000100000001 /* ConvocationView.swift in Sources */,
+				B10000A82C8D000100000001 /* ChildPairingView.swift in Sources */,
+				B10000AA2C8D000100000001 /* ParentPairingView.swift in Sources */,
+				B10000AD2C8D000100000001 /* ParentDashboardView.swift in Sources */,
+				B10000B02C8D000100000001 /* RoleSelectionView.swift in Sources */,
+				B10000B32C8D000100000001 /* ChildSettingsView.swift in Sources */,
+				B10000B52C8D000100000001 /* ParentSettingsView.swift in Sources */,
+				B10000B72C8D000100000001 /* ProtectedDisconnectView.swift in Sources */,
+				B10000B92C8D000100000001 /* SettingsView.swift in Sources */,
+				B10000BC2C8D000100000001 /* SplashScreenView.swift in Sources */,
+				B10000BF2C8D000100000001 /* BatteryService.swift in Sources */,
+				B10000C12C8D000100000001 /* DeviceHealthService.swift in Sources */,
+				B10000C32C8D000100000001 /* LocationService.swift in Sources */,
+				B10000C52C8D000100000001 /* NetworkMonitoringService.swift in Sources */,
+				B10000C72C8D000100000001 /* NotificationService.swift in Sources */,
+				B10000C92C8D000100000001 /* TelemetrySyncService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -196,12 +490,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B10000012C8D000100000001 /* AuthenticationTests.swift in Sources */,
-				B10000032C8D000100000001 /* PairingAndReloginTests.swift in Sources */,
-				B10000052C8D000100000001 /* ProtectedDisconnectTests.swift in Sources */,
-				B10000072C8D000100000001 /* CrackFreakTests.swift in Sources */,
-				B10000092C8D000100000001 /* ChildDashboardOrderTests.swift in Sources */,
-				B10000112C8D000100000001 /* CrossPlatformParentIPhoneChildAndroidTests.swift in Sources */,
+				B10000D02C8D000100000001 /* AuthenticationTests.swift in Sources */,
+				B10000D22C8D000100000001 /* ChildDashboardOrderTests.swift in Sources */,
+				B10000D42C8D000100000001 /* CrackFreakTests.swift in Sources */,
+				B10000D62C8D000100000001 /* CrossPlatformParentIPhoneChildAndroidTests.swift in Sources */,
+				B10000D82C8D000100000001 /* PairingAndReloginTests.swift in Sources */,
+				B10000DA2C8D000100000001 /* ProtectedDisconnectTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
