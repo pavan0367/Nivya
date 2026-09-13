@@ -114,6 +114,18 @@ export const SettingsPage: React.FC = () => {
       } catch (emailErr) {
         console.warn('Email preferences endpoint not available, using defaults:', emailErr);
       }
+
+      // Fetch active pairing code for parent enrolment
+      try {
+        const pairRes = await apiClient.post('/pairing/code', {
+          deviceFingerprint: navigator.userAgent
+        });
+        if (pairRes.data?.data?.code) {
+          setPairingCode(pairRes.data.data.code);
+        }
+      } catch (pairErr) {
+        console.warn('Initial pairing code could not be auto-loaded:', pairErr);
+      }
     } catch (err: any) {
       console.error('Failed to load settings:', err);
       setError('Unable to load configuration records.');
@@ -181,9 +193,18 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleGenerateNewCode = () => {
-    const randomCode = `NV-${Math.floor(100000 + Math.random() * 900000)}`;
-    setPairingCode(randomCode);
+  const handleGenerateNewCode = async () => {
+    try {
+      const res = await apiClient.post('/pairing/code', {
+        deviceFingerprint: navigator.userAgent
+      });
+      if (res.data?.data?.code) {
+        setPairingCode(res.data.data.code);
+      }
+    } catch (err: any) {
+      console.error('Failed to generate pairing code:', err);
+      setError(err.response?.data?.message || 'Failed to generate new pairing code');
+    }
   };
 
   if (loading) {
@@ -369,7 +390,7 @@ export const SettingsPage: React.FC = () => {
       <ContentCard
         id="card-pairing-code"
         title="Enroll New Child Device"
-        subtitle="Provide this 6-digit one-time pairing key in the Nivya Android child application during onboarding"
+        subtitle="Provide this one-time pairing key (e.g. NV-7K3M-2W9P) on your child's device during onboarding"
       >
         <div
           style={{
@@ -416,7 +437,7 @@ export const SettingsPage: React.FC = () => {
               >
                 {pairingCode}
               </div>
-              <small style={{ color: 'var(--text-muted)' }}>Valid for 15 minutes • Single child device link</small>
+              <small style={{ color: 'var(--text-muted)' }}>Valid for 10 minutes • Single child device link</small>
             </div>
           </div>
 

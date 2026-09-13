@@ -49,9 +49,10 @@ public struct ChildPairingView: View {
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundColor(NivyaColors.textSecondary)
 
-                            TextField("e.g. 849201", text: $code)
+                            TextField("e.g. NV-7K3M-2W9P", text: $code)
                                 .font(.system(size: 24, weight: .bold, design: .monospaced))
-                                .keyboardType(.numberPad)
+                                .textInputAutocapitalization(.characters)
+                                .autocorrectionDisabled(true)
                                 .multilineTextAlignment(.center)
                                 .foregroundColor(.white)
                                 .padding()
@@ -91,8 +92,8 @@ public struct ChildPairingView: View {
                             .foregroundColor(.white)
                             .cornerRadius(12)
                         }
-                        .disabled(isLoading || code.count < 6)
-                        .opacity(isLoading || code.count < 6 ? 0.6 : 1.0)
+                        .disabled(isLoading || code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .opacity(isLoading || code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.6 : 1.0)
                     }
                     .padding(20)
                     .background(NivyaColors.surfaceCard)
@@ -112,7 +113,7 @@ public struct ChildPairingView: View {
     }
 
     private func handlePair() {
-        guard code.count >= 6 else { return }
+        guard !code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         isLoading = true
         errorMessage = nil
 

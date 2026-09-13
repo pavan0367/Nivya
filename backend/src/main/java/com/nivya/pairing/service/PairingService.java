@@ -52,9 +52,9 @@ import java.util.UUID;
 public class PairingService {
 
     private static final Logger log = LoggerFactory.getLogger(PairingService.class);
-    private static final String CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    private static final String CODE_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     private static final long CODE_TTL_MINUTES = 10;
-    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final PairingRequestRepository pairingRequestRepository;
     private final UserRepository userRepository;
@@ -161,7 +161,7 @@ public class PairingService {
             auditLogRepository.save(new AuditLog(
                     currentUser.getId(),
                     "PAIRING_CODE_NOT_FOUND",
-                    "Attempted non-existent code: " + normalizedCode,
+                    "Attempted non-existent pairing code",
                     ipAddress
             ));
             throw new PairingException("Invalid or non-existent pairing code.");
@@ -189,7 +189,7 @@ public class PairingService {
             auditLogRepository.save(new AuditLog(
                     currentUser.getId(),
                     "PAIRING_CODE_EXPIRED",
-                    "Attempted expired code: " + normalizedCode,
+                    "Attempted expired pairing code",
                     ipAddress
             ));
             throw new PairingException("Pairing code has expired. Please request a new code.");
@@ -619,21 +619,20 @@ public class PairingService {
     }
 
     private String generateUniqueCode() {
-        for (int attempt = 0; attempt < 10; attempt++) {
+        while (true) {
             StringBuilder sb = new StringBuilder("NV-");
             for (int i = 0; i < 4; i++) {
-                sb.append(CODE_CHARS.charAt(RANDOM.nextInt(CODE_CHARS.length())));
+                sb.append(CODE_CHARS.charAt(SECURE_RANDOM.nextInt(CODE_CHARS.length())));
             }
             sb.append("-");
             for (int i = 0; i < 4; i++) {
-                sb.append(CODE_CHARS.charAt(RANDOM.nextInt(CODE_CHARS.length())));
+                sb.append(CODE_CHARS.charAt(SECURE_RANDOM.nextInt(CODE_CHARS.length())));
             }
             String code = sb.toString();
             if (pairingRequestRepository.findByConnectionCode(code).isEmpty()) {
                 return code;
             }
         }
-        return "NV-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
     }
 
     private String normalizeCode(String code) {
@@ -653,11 +652,11 @@ public class PairingService {
     private String generateDisconnectCodeString() {
         StringBuilder sb = new StringBuilder("DIS-");
         for (int i = 0; i < 4; i++) {
-            sb.append(CODE_CHARS.charAt(RANDOM.nextInt(CODE_CHARS.length())));
+            sb.append(CODE_CHARS.charAt(SECURE_RANDOM.nextInt(CODE_CHARS.length())));
         }
         sb.append("-");
         for (int i = 0; i < 4; i++) {
-            sb.append(CODE_CHARS.charAt(RANDOM.nextInt(CODE_CHARS.length())));
+            sb.append(CODE_CHARS.charAt(SECURE_RANDOM.nextInt(CODE_CHARS.length())));
         }
         return sb.toString();
     }

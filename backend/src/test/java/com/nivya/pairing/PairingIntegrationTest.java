@@ -95,6 +95,12 @@ class PairingIntegrationTest {
     @Autowired
     private com.nivya.history.repository.HistoryEventRepository historyEventRepository;
 
+    @Autowired
+    private com.nivya.email.repository.EmailNotificationRepository emailNotificationRepository;
+
+    @Autowired
+    private com.nivya.email.repository.EmailVerificationCodeRepository emailVerificationCodeRepository;
+
     @BeforeEach
     void setUp() {
         rateLimiter.clearAll();
@@ -110,6 +116,8 @@ class PairingIntegrationTest {
         deviceRepository.deleteAll();
         familyMemberRepository.deleteAll();
         familyRepository.deleteAll();
+        emailNotificationRepository.deleteAll();
+        emailVerificationCodeRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
     }

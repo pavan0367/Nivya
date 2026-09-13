@@ -2,7 +2,7 @@ import SwiftUI
 
 public struct ParentPairingView: View {
     @ObservedObject private var appState = AppState.shared
-    @State private var pairingCode: String = "------"
+    @State private var pairingCode: String = "NV-••••-••••"
     @State private var ttlMinutes: Int = 10
     @State private var isLoading: Bool = false
     @State private var errorMessage: String? = nil
