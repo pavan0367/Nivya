@@ -16,7 +16,7 @@ public class DeviceSession {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "device_fingerprint", nullable = false, length = 128)
+    @Column(name = "device_fingerprint", nullable = false, length = 255)
     private String deviceFingerprint;
 
     @Column(name = "device_name", length = 100)

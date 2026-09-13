@@ -32,7 +32,7 @@ public class PairingRequest {
     @Column(nullable = false, length = 20)
     private PairingStatus status = PairingStatus.PENDING;
 
-    @Column(name = "device_fingerprint", length = 100)
+    @Column(name = "device_fingerprint", length = 255)
     private String deviceFingerprint;
 
     @Column(name = "expires_at", nullable = false)

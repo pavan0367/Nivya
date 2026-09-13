@@ -46,7 +46,7 @@ public class DeviceSessionService {
     public DeviceSession recordLogin(User user, String fingerprint, String deviceName,
                                      String platform, String osVersion, String appVersion, String ipAddress) {
         String safeFingerprint = fingerprint != null && !fingerprint.isBlank()
-                ? fingerprint
+                ? (fingerprint.length() > 255 ? fingerprint.substring(0, 255) : fingerprint)
                 : "fp-" + user.getId() + "-" + (ipAddress != null ? ipAddress.replace(":", ".") : "local");
 
         long previousSessionsCount = sessionRepository.countByUserIdAndDeviceFingerprint(user.getId(), safeFingerprint);

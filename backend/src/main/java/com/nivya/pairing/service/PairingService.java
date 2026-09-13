@@ -22,6 +22,7 @@ import com.nivya.pairing.repository.PairingRequestRepository;
 import com.nivya.role.RoleType;
 import com.nivya.security.UserPrincipal;
 import com.nivya.user.entity.User;
+import com.nivya.user.entity.UserStatus;
 import com.nivya.user.repository.UserRepository;
 import com.nivya.websocket.service.RealtimeBroadcastService;
 import com.nivya.pairing.entity.DisconnectCode;
@@ -97,10 +98,22 @@ public class PairingService {
      */
     @Transactional
     public PairingCodeResponse generatePairingCode(UserPrincipal principal, GenerateCodeRequest request, String ipAddress) {
+        if (principal == null || principal.getId() == null) {
+            throw new AccessDeniedException("User is not authenticated");
+        }
+
         User user = userRepository.findById(principal.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + principal.getId()));
 
+        if (user.getStatus() == UserStatus.SUSPENDED) {
+            throw new AccessDeniedException("User account is suspended");
+        }
+
         RoleType myRole = user.getRole();
+        if (myRole == null) {
+            throw new IllegalArgumentException("User role is not assigned. Please select a role first.");
+        }
+
         RoleType targetRole = (myRole == RoleType.PARENT) ? RoleType.CHILD : RoleType.PARENT;
 
         // Invalidate any existing active pairing codes for this user
@@ -113,7 +126,15 @@ public class PairingService {
         // Generate unique code in NV-XXXX-XXXX format
         String code = generateUniqueCode();
         Instant expiresAt = Instant.now().plus(Duration.ofMinutes(CODE_TTL_MINUTES));
-        String fingerprint = (request != null) ? request.getDeviceFingerprint() : null;
+
+        // Sanitize and safely bound device fingerprint to column length (max 255 chars)
+        String fingerprint = null;
+        if (request != null && request.getDeviceFingerprint() != null) {
+            String fp = request.getDeviceFingerprint().trim();
+            if (!fp.isEmpty()) {
+                fingerprint = fp.length() > 255 ? fp.substring(0, 255) : fp;
+            }
+        }
 
         PairingRequest pairingRequest = new PairingRequest(user, code, targetRole, expiresAt, fingerprint);
         pairingRequestRepository.save(pairingRequest);
@@ -134,6 +155,10 @@ public class PairingService {
      */
     @Transactional
     public PairingStatusResponse connectDevices(UserPrincipal principal, ConnectPairingRequest request, String ipAddress) {
+        if (principal == null || principal.getId() == null) {
+            throw new AccessDeniedException("User is not authenticated");
+        }
+
         String rateLimitKey = principal.getId() + ":" + ipAddress;
 
         // Security check: Rate limiting and brute-force prevention
@@ -150,6 +175,10 @@ public class PairingService {
         // 1. Authenticate user
         User currentUser = userRepository.findById(principal.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user record not found"));
+
+        if (currentUser.getStatus() == UserStatus.SUSPENDED) {
+            throw new AccessDeniedException("User account is suspended");
+        }
 
         String rawCode = request.getCode();
         String normalizedCode = normalizeCode(rawCode);
