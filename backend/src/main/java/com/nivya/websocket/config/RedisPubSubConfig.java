@@ -5,6 +5,8 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.nivya.websocket.redis.RedisMessageSubscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.data.redis.LettuceClientConfigurationBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -14,6 +16,7 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.data.redis.listener.adapter.MessageListenerAdapter;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.util.StringUtils;
 
 import java.util.UUID;
 
@@ -37,6 +40,18 @@ public class RedisPubSubConfig {
     @Bean
     public ChannelTopic realtimeTopic() {
         return new ChannelTopic(REALTIME_CHANNEL);
+    }
+
+    @Bean
+    public LettuceClientConfigurationBuilderCustomizer lettuceClientConfigurationCustomizer(
+            @Value("${spring.data.redis.ssl.enabled:false}") boolean sslEnabled,
+            @Value("${spring.data.redis.url:}") String redisUrl) {
+        return clientConfigurationBuilder -> {
+            if (sslEnabled || (StringUtils.hasText(redisUrl) && redisUrl.startsWith("rediss://"))) {
+                log.info("Configuring Lettuce client with TLS/SSL for secure Redis connection");
+                clientConfigurationBuilder.useSsl();
+            }
+        };
     }
 
     @Bean

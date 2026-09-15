@@ -51,9 +51,12 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      username: ${REDIS_USERNAME:default}
       password: ${REDIS_PASSWORD:}
       database: ${REDIS_DATABASE:0}
-      timeout: ${REDIS_TIMEOUT:2000ms}
+      timeout: ${REDIS_TIMEOUT:5000ms}
+      ssl:
+        enabled: ${REDIS_SSL_ENABLED:${SPRING_DATA_REDIS_SSL_ENABLED:false}}
 
 # Security & Application Settings
 nivya:
