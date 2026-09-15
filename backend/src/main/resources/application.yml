@@ -73,6 +73,22 @@ nivya:
     enabled: ${FIREBASE_ENABLED:true}
     credentials-path: ${FIREBASE_CREDENTIALS_PATH:}
     credentials-json: ${FIREBASE_CREDENTIALS_JSON:}
+  email:
+    verification-required: ${EMAIL_VERIFICATION_REQUIRED:false}
+    provider: ${EMAIL_PROVIDER:SIMULATION}
+    from: ${MAIL_FROM:${EMAIL_FROM:${SMTP_FROM:noreply@nivya.com}}}
+    smtp:
+      host: ${SMTP_HOST:smtp.gmail.com}
+      port: ${SMTP_PORT:587}
+      username: ${SMTP_USERNAME:}
+      password: ${SMTP_PASSWORD:}
+      auth: ${SMTP_AUTH:true}
+      starttls:
+        enable: ${SMTP_STARTTLS:${SMTP_STARTTLS_ENABLE:true}}
+        required: ${SMTP_STARTTLS:${SMTP_STARTTLS_REQUIRED:true}}
+      connection-timeout: ${SMTP_CONNECTION_TIMEOUT:5000}
+      timeout: ${SMTP_TIMEOUT:5000}
+      write-timeout: ${SMTP_WRITE_TIMEOUT:5000}
 
 # Actuator Endpoints Configuration
 management:

@@ -173,7 +173,7 @@ export const PairingScreen: React.FC<PairingScreenProps> = ({
         onPairingComplete();
       }
       setTimeout(() => {
-        navigate('/dashboard');
+        navigate(currentRole === 'CHILD' ? '/child' : '/dashboard');
       }, 1000);
     } catch (err: any) {
       setErrorMessage(err.message || 'Connection error. Check code and network.');
@@ -251,10 +251,10 @@ export const PairingScreen: React.FC<PairingScreenProps> = ({
               onClick={() => {
                 localStorage.setItem('nivya_is_paired', 'true');
                 if (onPairingComplete) onPairingComplete();
-                navigate('/dashboard');
+                navigate(currentRole === 'CHILD' ? '/child' : '/dashboard');
               }}
             >
-              Proceed to Dashboard →
+              Proceed to {currentRole === 'CHILD' ? 'Child Home' : 'Dashboard'} →
             </button>
           </div>
         )}

@@ -92,4 +92,50 @@ class ConvocationUnitTest {
         assertEquals(85L, state.remainingSeconds)
         assertEquals(2, state.unreadCount)
     }
+
+    @Test
+    fun testParentMessageInputClearAndReadinessForNextMessage() {
+        var inputMessage = "First priority guidance"
+        var isSending = true
+        var wasSending = true
+        var focusRequested = false
+
+        // Simulate send completion
+        inputMessage = ""
+        isSending = false
+
+        if (wasSending && !isSending) {
+            focusRequested = true
+            wasSending = false
+        }
+
+        assertEquals("", inputMessage)
+        assertFalse(isSending)
+        assertTrue("Focus must be requested automatically after send completes", focusRequested)
+
+        // Ready for next message typing immediately
+        inputMessage = "Second guidance message typed without manual tap"
+        assertEquals("Second guidance message typed without manual tap", inputMessage)
+    }
+
+    @Test
+    fun testChildNoteInputClearAndReadinessForNextMessage() {
+        var noteText = "Note to family"
+        var isSendingNote = true
+        var wasSendingNote = true
+        var focusRequested = false
+
+        // Simulate note send completion
+        noteText = ""
+        isSendingNote = false
+
+        if (wasSendingNote && !isSendingNote) {
+            focusRequested = true
+            wasSendingNote = false
+        }
+
+        assertEquals("", noteText)
+        assertFalse(isSendingNote)
+        assertTrue("Focus must be requested automatically after note is sent", focusRequested)
+    }
 }

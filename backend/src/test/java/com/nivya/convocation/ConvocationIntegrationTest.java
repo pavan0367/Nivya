@@ -8,6 +8,7 @@ import com.nivya.convocation.dto.ParentSendMessageRequest;
 import com.nivya.convocation.entity.ConvocationMessage;
 import com.nivya.convocation.repository.ConvocationMessageRepository;
 import com.nivya.convocation.repository.ConvocationViewRepository;
+import com.nivya.device.entity.Device;
 import com.nivya.family.entity.Family;
 import com.nivya.family.entity.FamilyMember;
 import com.nivya.family.repository.FamilyMemberRepository;
@@ -118,6 +119,9 @@ class ConvocationIntegrationTest {
     @Autowired
     private com.nivya.battery.repository.BatteryStatusRepository batteryStatusRepository;
 
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
     private User parentUser;
     private User childUser;
     private User outsiderChildUser;
@@ -171,29 +175,14 @@ class ConvocationIntegrationTest {
     }
 
     private void cleanDatabases() {
+        jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE;");
         convocationMessageRepository.deleteAll();
         convocationViewRepository.deleteAll();
-        notificationRecordRepository.deleteAll();
-        alertRuleRepository.deleteAll();
-        locationHistoryRepository.deleteAll();
-        locationStatusRepository.deleteAll();
-        deviceHealthRepository.deleteAll();
-        usageAppRepository.deleteAll();
-        usageSummaryRepository.deleteAll();
-        networkHistoryRepository.deleteAll();
-        networkStatusRepository.deleteAll();
-        batteryHistoryRepository.deleteAll();
-        batteryStatusRepository.deleteAll();
-        alertRepository.deleteAll();
-        activityEventRepository.deleteAll();
-        historyEventRepository.deleteAll();
-        deviceStatusRepository.deleteAll();
-        deviceRepository.deleteAll();
-        consentRepository.deleteAll();
         familyMemberRepository.deleteAll();
         familyRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
+        jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE;");
     }
 
     @Test
@@ -452,5 +441,230 @@ class ConvocationIntegrationTest {
         mockMvc.perform(get("/api/v1/convocation/child/unread")
                         .header("Authorization", "Bearer " + outsiderChildToken))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Scenario 21: Parent can unsend own message; removed from visible history")
+    void test21_ParentCanUnsendOwnMessage() throws Exception {
+        // Parent sends message
+        MvcResult res = mockMvc.perform(post("/api/v1/convocation/parent/send")
+                        .header("Authorization", "Bearer " + parentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ParentSendMessageRequest(childUser.getId(), "Mistake message"))))
+                .andExpect(status().isOk())
+                .andReturn();
+        Long messageId = objectMapper.readTree(res.getResponse().getContentAsString()).get("data").get("id").asLong();
+
+        // Parent unsends it
+        mockMvc.perform(post("/api/v1/convocation/parent/message/" + messageId + "/unsend")
+                        .header("Authorization", "Bearer " + parentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        // Parent history no longer contains the unsent message
+        mockMvc.perform(get("/api/v1/convocation/parent/history")
+                        .header("Authorization", "Bearer " + parentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(0)));
+
+        // Child unread also does not contain the unsent message
+        mockMvc.perform(get("/api/v1/convocation/child/unread")
+                        .header("Authorization", "Bearer " + childToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(0)));
+    }
+
+    @Test
+    @DisplayName("Scenario 22: Parent cannot unsend child-originated message")
+    void test22_ParentCannotUnsendChildMessage() throws Exception {
+        // Child sends note
+        mockMvc.perform(post("/api/v1/convocation/child/send")
+                        .header("Authorization", "Bearer " + childToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ChildSendMessageRequest("Mom,here"))))
+                .andExpect(status().isOk());
+
+        List<ConvocationMessage> msgs = convocationMessageRepository.findByFamilyIdOrderByCreatedAtAsc(family.getId());
+        assertEquals(1, msgs.size());
+        Long childMsgId = msgs.get(0).getId();
+
+        // Parent attempts to unsend child note -> 403 Forbidden
+        mockMvc.perform(post("/api/v1/convocation/parent/message/" + childMsgId + "/unsend")
+                        .header("Authorization", "Bearer " + parentToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Scenario 23: Child cannot call parent unsend endpoint")
+    void test23_ChildCannotUnsendParentMessage() throws Exception {
+        // Parent sends message
+        MvcResult res = mockMvc.perform(post("/api/v1/convocation/parent/send")
+                        .header("Authorization", "Bearer " + parentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ParentSendMessageRequest(childUser.getId(), "Parent message"))))
+                .andExpect(status().isOk())
+                .andReturn();
+        Long msgId = objectMapper.readTree(res.getResponse().getContentAsString()).get("data").get("id").asLong();
+
+        // Child attempts to unsend parent message -> 403 Forbidden
+        mockMvc.perform(post("/api/v1/convocation/parent/message/" + msgId + "/unsend")
+                        .header("Authorization", "Bearer " + childToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Scenario 24: Parent can toggle pin on message")
+    void test24_ParentCanTogglePinMessage() throws Exception {
+        // Parent sends message
+        MvcResult res = mockMvc.perform(post("/api/v1/convocation/parent/send")
+                        .header("Authorization", "Bearer " + parentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ParentSendMessageRequest(childUser.getId(), "Important message"))))
+                .andExpect(status().isOk())
+                .andReturn();
+        Long msgId = objectMapper.readTree(res.getResponse().getContentAsString()).get("data").get("id").asLong();
+
+        // Pin it
+        mockMvc.perform(post("/api/v1/convocation/parent/message/" + msgId + "/pin")
+                        .header("Authorization", "Bearer " + parentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.pinned").value(true));
+
+        // Unpin it
+        mockMvc.perform(post("/api/v1/convocation/parent/message/" + msgId + "/pin")
+                        .header("Authorization", "Bearer " + parentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.pinned").value(false));
+    }
+
+    @Test
+    @DisplayName("Scenario 25: Parent can react to Child message")
+    void test25_ParentCanReactToChildMessage() throws Exception {
+        // Child sends note
+        mockMvc.perform(post("/api/v1/convocation/child/send")
+                        .header("Authorization", "Bearer " + childToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ChildSendMessageRequest("Mom,here"))))
+                .andExpect(status().isOk());
+
+        Long childMsgId = convocationMessageRepository.findByFamilyIdOrderByCreatedAtAsc(family.getId()).get(0).getId();
+
+        // Parent reacts
+        mockMvc.perform(post("/api/v1/convocation/parent/message/" + childMsgId + "/react")
+                        .header("Authorization", "Bearer " + parentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reaction\":\"❤️\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reaction").value("❤️"));
+    }
+
+    @Test
+    @DisplayName("Scenario 26: Parent can reply referencing original message")
+    void test26_ParentCanReplyToMessage() throws Exception {
+        // Child sends note
+        mockMvc.perform(post("/api/v1/convocation/child/send")
+                        .header("Authorization", "Bearer " + childToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ChildSendMessageRequest("Where are you?"))))
+                .andExpect(status().isOk());
+
+        Long childMsgId = convocationMessageRepository.findByFamilyIdOrderByCreatedAtAsc(family.getId()).get(0).getId();
+
+        // Parent replies
+        ParentSendMessageRequest replyReq = new ParentSendMessageRequest(childUser.getId(), "On my way home", childMsgId);
+        mockMvc.perform(post("/api/v1/convocation/parent/send")
+                        .header("Authorization", "Bearer " + parentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(replyReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.replyToId").value(childMsgId));
+    }
+
+    @Test
+    @DisplayName("Scenario 27: Parent can send message without receiverUserId (auto-resolved from family)")
+    void test27_ParentSendMessageAutoResolvesChild() throws Exception {
+        // receiverUserId is null
+        ParentSendMessageRequest req = new ParentSendMessageRequest(null, "Dinner is ready!");
+        mockMvc.perform(post("/api/v1/convocation/parent/send")
+                        .header("Authorization", "Bearer " + parentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.receiverUserId").value(childUser.getId()))
+                .andExpect(jsonPath("$.data.message").value("Dinner is ready!"));
+    }
+
+    @Test
+    @DisplayName("Scenario 28: Parent can send message with targetDeviceId")
+    void test28_ParentSendMessageWithTargetDeviceId() throws Exception {
+        Device childDevice = new Device();
+        childDevice.setUser(childUser);
+        childDevice.setFamily(family);
+        childDevice.setDeviceUuid("dev-child-conv-target-01");
+        childDevice.setDeviceName("Child iPad");
+        childDevice.setPlatform("IOS");
+        childDevice = deviceRepository.save(childDevice);
+
+        ParentSendMessageRequest req = new ParentSendMessageRequest(null, "Time for bed", null, childDevice.getId());
+        mockMvc.perform(post("/api/v1/convocation/parent/send")
+                        .header("Authorization", "Bearer " + parentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.receiverUserId").value(childUser.getId()));
+    }
+
+    @Test
+    @DisplayName("Scenario 29: Child role cannot POST to parent send endpoint (returns 403)")
+    void test29_ChildCannotPostToParentSend() throws Exception {
+        ParentSendMessageRequest req = new ParentSendMessageRequest(parentUser.getId(), "Should be rejected");
+        mockMvc.perform(post("/api/v1/convocation/parent/send")
+                        .header("Authorization", "Bearer " + childToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Scenario 30: Unauthenticated user cannot POST to parent send endpoint (returns 401)")
+    void test30_UnauthenticatedCannotPostToParentSend() throws Exception {
+        ParentSendMessageRequest req = new ParentSendMessageRequest(null, "No token");
+        mockMvc.perform(post("/api/v1/convocation/parent/send")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("Scenario 31: Requirement 17 - Old viewed Parent message does not reappear when a new Parent message arrives")
+    void test31_ChildOldViewedMessageDoesNotReappearWhenNewMessageArrives() throws Exception {
+        // 1. Parent sends Message A
+        mockMvc.perform(post("/api/v1/convocation/parent/send")
+                        .header("Authorization", "Bearer " + parentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ParentSendMessageRequest(childUser.getId(), "Message A"))))
+                .andExpect(status().isOk());
+
+        // 2. Child turns ON and views Message A
+        mockMvc.perform(post("/api/v1/convocation/child/view/start")
+                        .header("Authorization", "Bearer " + childToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.messages", hasSize(1)))
+                .andExpect(jsonPath("$.data.messages[0].message").value("Message A"));
+
+        // 3. Parent sends Message B
+        mockMvc.perform(post("/api/v1/convocation/parent/send")
+                        .header("Authorization", "Bearer " + parentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ParentSendMessageRequest(childUser.getId(), "Message B"))))
+                .andExpect(status().isOk());
+
+        // 4. Child turns ON / refreshes viewing session for Message B
+        // Visible set must contain ONLY Message B, NOT Message A + B
+        mockMvc.perform(post("/api/v1/convocation/child/view/start")
+                        .header("Authorization", "Bearer " + childToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.messages", hasSize(1)))
+                .andExpect(jsonPath("$.data.messages[0].message").value("Message B"));
     }
 }

@@ -14,6 +14,7 @@ public class EmailNotification {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
+    @org.hibernate.annotations.OnDelete(action = org.hibernate.annotations.OnDeleteAction.CASCADE)
     private User user;
 
     @Column(name = "recipient_email", nullable = false, length = 191)

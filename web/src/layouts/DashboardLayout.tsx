@@ -57,10 +57,23 @@ export const DashboardLayout: React.FC = () => {
 
     // Fetch family devices
     authService.getFamilyDevices().then((devs) => {
-      setDevices(devs);
-      if (devs.length > 0) {
-        setSelectedDeviceId(devs[0].id);
-        localStorage.setItem('nivya_active_device_id', devs[0].id.toString());
+      // Prioritize child devices for parent dashboard monitoring (never select parent device)
+      const childDevs = devs.filter((d) => (d.isChildDevice || d.userRole === 'CHILD') && d.userRole !== 'PARENT');
+      setDevices(childDevs);
+
+      if (childDevs.length > 0) {
+        const savedIdStr = localStorage.getItem('nivya_parent_active_device_id') || localStorage.getItem('nivya_active_device_id');
+        const savedId = savedIdStr ? Number(savedIdStr) : null;
+        const matched = childDevs.find((d) => d.id === savedId);
+        const chosenDevice = matched || childDevs[0];
+
+        if (chosenDevice && chosenDevice.id != null) {
+          setSelectedDeviceId(chosenDevice.id);
+          localStorage.setItem('nivya_parent_active_device_id', String(chosenDevice.id));
+          localStorage.setItem('nivya_active_device_id', String(chosenDevice.id));
+        }
+      } else {
+        setSelectedDeviceId(null);
       }
     });
 
@@ -83,6 +96,7 @@ export const DashboardLayout: React.FC = () => {
   const handleDeviceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const devId = Number(e.target.value);
     setSelectedDeviceId(devId);
+    localStorage.setItem('nivya_parent_active_device_id', devId.toString());
     localStorage.setItem('nivya_active_device_id', devId.toString());
     window.dispatchEvent(new Event('nivya-device-changed'));
   };
@@ -246,7 +260,7 @@ export const DashboardLayout: React.FC = () => {
 
         {/* Body Pages */}
         <main className="page-body">
-          <Outlet context={{ activeDeviceId: selectedDeviceId }} />
+          <Outlet context={{ activeDeviceId: selectedDeviceId, activeDevice: devices.find((d) => d.id === selectedDeviceId) || null, devices }} />
         </main>
       </div>
     </div>

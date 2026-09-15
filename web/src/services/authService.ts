@@ -40,8 +40,18 @@ export const authService = {
 
   async getFamilyDevices(): Promise<Device[]> {
     try {
-      const response = await apiClient.get<ApiResponse<{ devices: Device[] }>>('/pairing/status');
-      return response.data.data?.devices || [];
+      const response = await apiClient.get<ApiResponse<{ devices: any[] }>>('/pairing/status');
+      const rawDevices = response.data.data?.devices || [];
+      return rawDevices.map((d) => {
+        const resolvedId = Number(d.id ?? d.deviceId ?? 0);
+        return {
+          ...d,
+          id: resolvedId,
+          deviceId: resolvedId,
+          isChildDevice: Boolean(d.isChildDevice || d.userRole === 'CHILD'),
+          status: d.status || (d.isOnline ? 'ACTIVE' : 'OFFLINE'),
+        };
+      });
     } catch {
       return [];
     }
@@ -83,6 +93,10 @@ export const authService = {
     localStorage.removeItem('nivya_refresh_token');
     localStorage.removeItem('nivya_user_role');
     localStorage.removeItem('nivya_user');
+    localStorage.removeItem('nivya_active_device_id');
+    localStorage.removeItem('nivya_child_active_device_id');
+    localStorage.removeItem('nivya_child_device');
+    localStorage.removeItem('nivya_parent_active_device_id');
     // Note: Do not remove nivya_is_paired on logout so relogin recognizes already paired device
     window.location.href = '/login';
   },
@@ -104,6 +118,10 @@ export const authService = {
     return this.getUserRole() === 'PARENT';
   },
 
+  isChild(): boolean {
+    return this.getUserRole() === 'CHILD';
+  },
+
   isPaired(): boolean {
     return localStorage.getItem('nivya_is_paired') === 'true';
   },
@@ -111,4 +129,40 @@ export const authService = {
   setPaired(paired: boolean): void {
     localStorage.setItem('nivya_is_paired', paired ? 'true' : 'false');
   },
+
+  async getDeletionStatus(): Promise<{
+    role: RoleType;
+    isChild: boolean;
+    hasConnectedParent: boolean;
+    connectedParentEmailMasked?: string;
+    instructions: string;
+  }> {
+    const response = await apiClient.get('/account/deletion/status');
+    return response.data.data;
+  },
+
+  async requestChildDeletionApproval(): Promise<{
+    success: boolean;
+    approvalCodeRequired: boolean;
+    parentEmailMasked?: string;
+    expiresInMinutes: number;
+    message: string;
+  }> {
+    const response = await apiClient.post('/account/deletion/request-child-approval');
+    return response.data.data;
+  },
+
+  async verifyChildDeletionCode(approvalCode: string): Promise<{
+    valid: boolean;
+    message: string;
+  }> {
+    const response = await apiClient.post('/account/deletion/verify-child-code', { approvalCode });
+    return response.data.data;
+  },
+
+  async deleteAccount(password?: string, approvalCode?: string): Promise<void> {
+    await apiClient.post('/account/delete', { password, approvalCode });
+    localStorage.clear();
+  },
 };
+

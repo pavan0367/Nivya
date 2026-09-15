@@ -32,11 +32,43 @@ import { Alert } from '../../types/alerts';
 
 interface OutletContextType {
   activeDeviceId: number | null;
+  activeDevice?: any | null;
+  devices?: any[];
 }
 
 export const DashboardPage: React.FC = () => {
-  const { activeDeviceId } = useOutletContext<OutletContextType>();
+  const context = useOutletContext<OutletContextType | undefined>();
+  const [activeDeviceId, setActiveDeviceId] = useState<number | null>(() => {
+    if (context?.activeDeviceId) return context.activeDeviceId;
+    const saved = localStorage.getItem('nivya_parent_active_device_id') || localStorage.getItem('nivya_active_device_id');
+    return saved ? Number(saved) : null;
+  });
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (context?.activeDeviceId) {
+      setActiveDeviceId(context.activeDeviceId);
+    }
+  }, [context?.activeDeviceId]);
+
+  useEffect(() => {
+    if (context?.activeDevice) {
+      const dev = context.activeDevice;
+      const online = Boolean(dev.isOnline && !dev.isStale);
+      setIsOnline(online);
+    }
+  }, [context?.activeDevice]);
+
+  useEffect(() => {
+    const handleDeviceChange = () => {
+      const saved = localStorage.getItem('nivya_parent_active_device_id') || localStorage.getItem('nivya_active_device_id');
+      if (saved) {
+        setActiveDeviceId(Number(saved));
+      }
+    };
+    window.addEventListener('nivya-device-changed', handleDeviceChange);
+    return () => window.removeEventListener('nivya-device-changed', handleDeviceChange);
+  }, []);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -54,6 +86,12 @@ export const DashboardPage: React.FC = () => {
 
   const loadData = useCallback(async (isInitial = false) => {
     if (!activeDeviceId) {
+      // If activeDeviceId is not yet set in state, recheck localStorage or wait for context
+      const saved = localStorage.getItem('nivya_parent_active_device_id') || localStorage.getItem('nivya_active_device_id');
+      if (saved) {
+        setActiveDeviceId(Number(saved));
+        return;
+      }
       setLoading(false);
       return;
     }
@@ -75,90 +113,42 @@ export const DashboardPage: React.FC = () => {
       if (batRes.status === 'fulfilled' && batRes.value) {
         setBattery(batRes.value);
       } else {
-        // Fallback demo state if backend returns empty
-        setBattery({
-          batteryPct: 82,
-          isCharging: false,
-          powerSaveMode: false,
-          healthStatus: 'GOOD',
-          recordedAt: new Date().toISOString(),
-        });
+        setBattery(null);
       }
 
       if (batHistRes.status === 'fulfilled' && batHistRes.value && batHistRes.value.length > 0) {
         setBatteryHistory(batHistRes.value);
       } else {
-        // Default battery history points for clean visualization
-        setBatteryHistory([
-          { batteryPct: 98, isCharging: true, powerSaveMode: false, healthStatus: 'GOOD', recordedAt: '08:00' },
-          { batteryPct: 92, isCharging: false, powerSaveMode: false, healthStatus: 'GOOD', recordedAt: '10:00' },
-          { batteryPct: 85, isCharging: false, powerSaveMode: false, healthStatus: 'GOOD', recordedAt: '12:00' },
-          { batteryPct: 82, isCharging: false, powerSaveMode: false, healthStatus: 'GOOD', recordedAt: '14:00' },
-        ]);
+        setBatteryHistory([]);
       }
 
       if (netRes.status === 'fulfilled' && netRes.value) {
         setNetwork(netRes.value);
-        setIsOnline(netRes.value.isInternetAvailable);
       } else {
-        setNetwork({
-          networkType: 'WIFI',
-          isInternetAvailable: true,
-          signalLevel: 4,
-          networkQuality: 'EXCELLENT',
-          ssid: 'Home_5G',
-          recordedAt: new Date().toISOString(),
-        });
-        setIsOnline(true);
+        setNetwork(null);
       }
 
       if (locRes.status === 'fulfilled' && locRes.value) {
         setLocation(locRes.value);
       } else {
-        setLocation({
-          latitude: 37.7749,
-          longitude: -122.4194,
-          accuracyMeters: 12,
-          locationName: 'Safe Home Zone',
-          isStale: false,
-          recordedAt: new Date().toISOString(),
-        });
+        setLocation(null);
       }
 
       if (usageRes.status === 'fulfilled' && usageRes.value) {
         setUsage(usageRes.value);
       } else {
-        setUsage({
-          deviceId: activeDeviceId,
-          date: new Date().toISOString().split('T')[0],
-          totalScreenTimeMinutes: 185,
-          categories: {
-            Education: 75,
-            Entertainment: 45,
-            Communication: 35,
-            Utilities: 30,
-          },
-          appUsages: [],
-        });
+        setUsage(null);
       }
 
       if (healthRes.status === 'fulfilled' && healthRes.value) {
         setHealth(healthRes.value);
       } else {
-        setHealth({
-          deviceId: activeDeviceId,
-          totalStorageBytes: 64 * 1024 * 1024 * 1024,
-          freeStorageBytes: 28 * 1024 * 1024 * 1024,
-          isLowStorage: false,
-          isHealthy: true,
-          permissions: { location: true, usage: true, notification: true },
-          recordedAt: new Date().toISOString(),
-        });
+        setHealth(null);
       }
 
-      // Fetch family alerts
+      // Fetch child/family alerts
       try {
-        const alertsList = await alertService.getFamilyAlerts(1, false);
+        const alertsList = await alertService.getChildAlerts();
         setRecentAlerts(alertsList.slice(0, 3));
       } catch {
         setRecentAlerts([]);
@@ -212,10 +202,7 @@ export const DashboardPage: React.FC = () => {
           const snapshot = await telemetryService.getSnapshot(activeDeviceId);
           if (snapshot) {
             if (snapshot.battery) setBattery(snapshot.battery);
-            if (snapshot.network) {
-              setNetwork(snapshot.network);
-              setIsOnline(snapshot.network.isInternetAvailable);
-            }
+            if (snapshot.network) setNetwork(snapshot.network);
             if (snapshot.location) setLocation(snapshot.location);
             if (snapshot.isOnline !== undefined) setIsOnline(snapshot.isOnline);
           }
@@ -262,10 +249,9 @@ export const DashboardPage: React.FC = () => {
   }
 
   // Format screen time
-  const totalMins = usage?.totalScreenTimeMinutes || 0;
-  const screenHours = Math.floor(totalMins / 60);
-  const screenRemMins = totalMins % 60;
-  const screenTimeText = `${screenHours}h ${screenRemMins}m`;
+  const screenTimeText = usage
+    ? `${Math.floor((usage.totalScreenTimeMinutes || 0) / 60)}h ${(usage.totalScreenTimeMinutes || 0) % 60}m`
+    : 'Unavailable';
 
   // Battery chart data points
   const batteryChartData = (batteryHistory && batteryHistory.length > 0)
@@ -273,24 +259,15 @@ export const DashboardPage: React.FC = () => {
         label: b.recordedAt ? b.recordedAt.slice(-5) : `T-${idx}`,
         value: b.batteryPct,
       }))
-    : [
-        { label: '08:00', value: 95 },
-        { label: '10:00', value: 90 },
-        { label: '12:00', value: 84 },
-        { label: '14:00', value: battery?.batteryPct || 80 },
-      ];
+    : [];
 
   // Screen time categories chart data
-  const usageChartData = usage?.categories
+  const usageChartData = usage?.categories && Object.keys(usage.categories).length > 0
     ? Object.entries(usage.categories).map(([cat, mins]) => ({
         label: cat,
         value: mins,
       }))
-    : [
-        { label: 'Education', value: 75 },
-        { label: 'Gaming', value: 45 },
-        { label: 'Social', value: 35 },
-      ];
+    : [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -298,8 +275,8 @@ export const DashboardPage: React.FC = () => {
       <OfflineIndicator
         id="dashboard-offline-banner"
         isOnline={isOnline}
-        deviceName="Target Child Device"
-        lastSyncAt={battery?.recordedAt}
+        deviceName={context?.activeDevice?.deviceName || 'Target Child Device'}
+        lastSyncAt={context?.activeDevice?.lastSync || context?.activeDevice?.lastSeen || battery?.recordedAt}
         banner={true}
       />
 
@@ -338,12 +315,15 @@ export const DashboardPage: React.FC = () => {
         <MetricCard
           id="metric-card-battery"
           title="Battery Level"
-          value={`${battery?.batteryPct ?? '--'}%`}
-          subtitle={battery?.isCharging ? '⚡ Charging Active' : 'On Battery'}
+          value={battery ? `${battery.batteryPct}%` : 'Unavailable'}
+          subtitle={battery ? (battery.isCharging ? '⚡ Charging Active' : 'On Battery') : 'Waiting for device data'}
           icon={battery?.isCharging ? <BatteryCharging size={24} /> : <Battery size={24} />}
-          badge={{
-            text: (battery?.healthStatus || 'GOOD').toUpperCase(),
-            variant: (battery?.batteryPct || 100) < 20 ? 'danger' : 'success',
+          badge={battery ? {
+            text: (battery.healthStatus || 'GOOD').toUpperCase(),
+            variant: (battery.batteryPct || 100) < 20 ? 'danger' : 'success',
+          } : {
+            text: 'WAITING',
+            variant: 'neutral',
           }}
           onClick={() => navigate('/device-health')}
         />
@@ -352,12 +332,15 @@ export const DashboardPage: React.FC = () => {
         <MetricCard
           id="metric-card-network"
           title="Network Connection"
-          value={network?.networkType || 'WIFI'}
-          subtitle={network?.ssid ? `SSID: ${network.ssid}` : 'Connected'}
+          value={network?.networkType || 'Unavailable'}
+          subtitle={network ? (network.ssid ? `SSID: ${network.ssid}` : (network.isInternetAvailable ? 'Connected' : 'No Internet')) : 'Waiting for device data'}
           icon={<Wifi size={24} />}
-          badge={{
-            text: network?.networkQuality || 'EXCELLENT',
-            variant: network?.networkQuality === 'POOR' ? 'warning' : 'success',
+          badge={network ? {
+            text: network.networkQuality || 'UNKNOWN',
+            variant: network.networkQuality === 'POOR' ? 'warning' : 'success',
+          } : {
+            text: 'WAITING',
+            variant: 'neutral',
           }}
         />
 
@@ -366,7 +349,7 @@ export const DashboardPage: React.FC = () => {
           id="metric-card-screentime"
           title="Today Screen Time"
           value={screenTimeText}
-          subtitle="Consented app foreground usage"
+          subtitle={usage ? 'Consented app foreground usage' : 'Waiting for device data'}
           icon={<Clock size={24} />}
           onClick={() => navigate('/usage')}
         />
@@ -375,12 +358,15 @@ export const DashboardPage: React.FC = () => {
         <MetricCard
           id="metric-card-location"
           title="Current Location"
-          value={location?.locationName || `${location?.latitude.toFixed(3) || '37.77'}, ${location?.longitude.toFixed(3) || '-122.41'}`}
-          subtitle={`Radius: ±${location?.accuracyMeters || 10}m`}
+          value={location ? (location.locationName || `${location.latitude.toFixed(3)}, ${location.longitude.toFixed(3)}`) : 'Unavailable'}
+          subtitle={location ? (location.isStale ? 'Stale fix' : `Radius: ±${location.accuracyMeters || 10}m`) : 'Waiting for device data'}
           icon={<MapPin size={24} />}
-          badge={{
-            text: location?.isStale ? 'STALE' : 'LIVE GPS',
-            variant: location?.isStale ? 'warning' : 'info',
+          badge={location ? {
+            text: location.isStale ? 'STALE' : 'LIVE GPS',
+            variant: location.isStale ? 'warning' : 'info',
+          } : {
+            text: 'WAITING',
+            variant: 'neutral',
           }}
           onClick={() => navigate('/location')}
         />
@@ -389,12 +375,15 @@ export const DashboardPage: React.FC = () => {
         <MetricCard
           id="metric-card-health"
           title="Device Health"
-          value={health?.isHealthy ? 'Optimal' : 'Needs Review'}
-          subtitle={health?.isLowStorage ? '⚠️ Low Storage Warning' : 'Storage & permissions OK'}
+          value={health ? (health.isHealthy ? 'Optimal' : 'Needs Review') : 'Unavailable'}
+          subtitle={health ? (health.isLowStorage ? '⚠️ Low Storage Warning' : 'Storage & permissions OK') : 'Waiting for device data'}
           icon={<HeartPulse size={24} />}
-          badge={{
-            text: health?.isHealthy ? 'HEALTHY' : 'WARNING',
-            variant: health?.isHealthy ? 'success' : 'warning',
+          badge={health ? {
+            text: health.isHealthy ? 'HEALTHY' : 'WARNING',
+            variant: health.isHealthy ? 'success' : 'warning',
+          } : {
+            text: 'WAITING',
+            variant: 'neutral',
           }}
           onClick={() => navigate('/device-health')}
         />
@@ -423,15 +412,21 @@ export const DashboardPage: React.FC = () => {
           subtitle="Recorded discharge and recharge cycle"
         >
           <div style={{ marginTop: '0.5rem' }}>
-            <LineChart
-              id="chart-battery-curve"
-              data={batteryChartData}
-              height={190}
-              color="var(--primary)"
-              unit="%"
-              minValue={0}
-              maxValue={100}
-            />
+            {batteryChartData.length > 0 ? (
+              <LineChart
+                id="chart-battery-curve"
+                data={batteryChartData}
+                height={190}
+                color="var(--primary)"
+                unit="%"
+                minValue={0}
+                maxValue={100}
+              />
+            ) : (
+              <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.875rem' }}>
+                Waiting for device battery telemetry history...
+              </div>
+            )}
           </div>
         </ContentCard>
 
@@ -451,13 +446,19 @@ export const DashboardPage: React.FC = () => {
           }
         >
           <div style={{ marginTop: '0.5rem' }}>
-            <BarChart
-              id="chart-screentime-bars"
-              data={usageChartData}
-              height={190}
-              color="var(--accent)"
-              unit="m"
-            />
+            {usageChartData.length > 0 ? (
+              <BarChart
+                id="chart-screentime-bars"
+                data={usageChartData}
+                height={190}
+                color="var(--accent)"
+                unit="m"
+              />
+            ) : (
+              <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.875rem' }}>
+                Waiting for device screen time telemetry...
+              </div>
+            )}
           </div>
         </ContentCard>
       </div>

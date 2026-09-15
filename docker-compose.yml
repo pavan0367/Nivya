@@ -98,6 +98,18 @@ services:
       FIREBASE_ENABLED: ${FIREBASE_ENABLED:-false}
       FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-}
       FIREBASE_CREDENTIALS_JSON: ${FIREBASE_CREDENTIALS_JSON:-}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-SIMULATION}
+      EMAIL_VERIFICATION_REQUIRED: ${EMAIL_VERIFICATION_REQUIRED:-false}
+      EMAIL_FROM: ${EMAIL_FROM:-${MAIL_FROM:-noreply@nivya.com}}
+      MAIL_FROM: ${MAIL_FROM:-${EMAIL_FROM:-noreply@nivya.com}}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_AUTH: ${SMTP_AUTH:-true}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-${SMTP_STARTTLS_ENABLE:-true}}
+      SMTP_STARTTLS_ENABLE: ${SMTP_STARTTLS_ENABLE:-${SMTP_STARTTLS:-true}}
+      SMTP_STARTTLS_REQUIRED: ${SMTP_STARTTLS_REQUIRED:-${SMTP_STARTTLS:-true}}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
       interval: 15s
@@ -122,6 +134,7 @@ services:
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
         VITE_WS_BASE_URL: ${VITE_WS_BASE_URL:-}
+        VITE_EMAIL_VERIFICATION_REQUIRED: ${EMAIL_VERIFICATION_REQUIRED:-false}
     container_name: nivya-frontend
     restart: unless-stopped
     depends_on:

@@ -39,7 +39,7 @@ public class NetworkController {
             @PathVariable Long deviceId,
             @AuthenticationPrincipal UserPrincipal principal) {
         NetworkStatusResponse response = networkService.getCurrentNetwork(deviceId, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Current network status retrieved"));
+        return ResponseEntity.ok(ApiResponse.success(response, response != null ? "Current network status retrieved" : "No network telemetry recorded yet"));
     }
 
     @GetMapping("/history/{deviceId}")

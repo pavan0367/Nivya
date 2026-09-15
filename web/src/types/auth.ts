@@ -36,6 +36,10 @@ export interface FamilyMember {
 
 export interface Device {
   id: number;
+  deviceId?: number;
+  userId?: number;
+  userRole?: RoleType | string;
+  isChildDevice?: boolean;
   deviceUuid: string;
   deviceName: string;
   platform: string;

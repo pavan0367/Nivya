@@ -40,25 +40,22 @@ public class RedisMessagePublisher {
     public void publish(RealtimeEvent event) {
         event.setOriginNodeId(serverNodeId);
 
-        boolean publishedToRedis = false;
+        // 1. Immediately deliver to local STOMP subscribers on this node for instant 0ms real-time delivery
+        try {
+            Object payload = objectMapper.readValue(event.getPayloadJson(), Object.class);
+            localMessagingTemplate.convertAndSend(event.getDestinationTopic(), payload);
+            log.debug("Delivered event [{}] locally to {}", event.getEventType(), event.getDestinationTopic());
+        } catch (Exception ex) {
+            log.error("Failed local delivery for destination {}: {}", event.getDestinationTopic(), ex.getMessage());
+        }
+
+        // 2. Publish to Redis channel for multi-instance cluster fanout
         try {
             String json = objectMapper.writeValueAsString(event);
             redisTemplate.convertAndSend(realtimeTopic.getTopic(), json);
-            publishedToRedis = true;
             log.debug("Published event [{}] to Redis topic {}", event.getEventType(), realtimeTopic.getTopic());
         } catch (Exception e) {
-            log.warn("Redis unavailable or failed to publish event (using local broker fallback): {}", e.getMessage());
-        }
-
-        // If Redis failed, or to ensure immediate local delivery without waiting for pub/sub loopback
-        if (!publishedToRedis) {
-            try {
-                Object payload = objectMapper.readValue(event.getPayloadJson(), Object.class);
-                localMessagingTemplate.convertAndSend(event.getDestinationTopic(), payload);
-                log.debug("Fallback: Delivered event [{}] locally to {}", event.getEventType(), event.getDestinationTopic());
-            } catch (Exception ex) {
-                log.error("Failed local fallback delivery for destination {}: {}", event.getDestinationTopic(), ex.getMessage());
-            }
+            log.warn("Redis unavailable or failed to publish event: {}", e.getMessage());
         }
     }
 }

@@ -16,4 +16,8 @@ public interface PairingRequestRepository extends JpaRepository<PairingRequest, 
     Optional<PairingRequest> findTopByRequesterIdAndStatusOrderByCreatedAtDesc(Long requesterId, PairingStatus status);
 
     List<PairingRequest> findByRequesterIdAndStatus(Long requesterId, PairingStatus status);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @org.springframework.data.jpa.repository.Query("DELETE FROM PairingRequest p WHERE p.requester.id = :userId OR (p.acceptedBy IS NOT NULL AND p.acceptedBy.id = :userId)")
+    void deleteAllByUserId(@org.springframework.data.repository.query.Param("userId") Long userId);
 }

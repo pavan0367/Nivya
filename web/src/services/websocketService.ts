@@ -8,6 +8,7 @@ class WebSocketManager {
   private client: Client | null = null;
   private status: WebSocketConnectionStatus = 'DISCONNECTED';
   private listeners: Map<string, Set<StompMessageCallback>> = new Map();
+  private activeSubscriptions: Map<string, any> = new Map();
   private connectionListeners: Set<(connected: boolean) => void> = new Set();
   private statusListeners: Set<(status: WebSocketConnectionStatus) => void> = new Set();
   private reconnectListeners: Set<() => void> = new Set();
@@ -52,6 +53,7 @@ class WebSocketManager {
       }
       this.client = null;
     }
+    this.activeSubscriptions.clear();
 
     this.client = new Client({
       webSocketFactory: () => new SockJS('/ws'),
@@ -83,6 +85,7 @@ class WebSocketManager {
         }
       },
       onDisconnect: () => {
+        this.activeSubscriptions.clear();
         if (!this.isManuallyClosed) {
           this.scheduleReconnect();
         } else {
@@ -91,11 +94,13 @@ class WebSocketManager {
       },
       onStompError: (frame) => {
         console.warn('STOMP protocol error:', frame.headers['message']);
+        this.activeSubscriptions.clear();
         if (!this.isManuallyClosed) {
           this.scheduleReconnect();
         }
       },
       onWebSocketClose: () => {
+        this.activeSubscriptions.clear();
         if (!this.isManuallyClosed) {
           this.scheduleReconnect();
         } else {
@@ -132,6 +137,7 @@ class WebSocketManager {
       this.reconnectTimeout = null;
     }
     this.reconnectAttempts = 0;
+    this.activeSubscriptions.clear();
     if (this.client) {
       this.client.deactivate();
       this.client = null;
@@ -142,11 +148,12 @@ class WebSocketManager {
   subscribe(topic: string, callback: StompMessageCallback): () => void {
     if (!this.listeners.has(topic)) {
       this.listeners.set(topic, new Set());
-      if (this.status === 'CONNECTED') {
-        this.subscribeInternal(topic);
-      }
     }
     this.listeners.get(topic)!.add(callback);
+
+    if (this.status === 'CONNECTED' && !this.activeSubscriptions.has(topic)) {
+      this.subscribeInternal(topic);
+    }
 
     return () => {
       const set = this.listeners.get(topic);
@@ -154,6 +161,15 @@ class WebSocketManager {
         set.delete(callback);
         if (set.size === 0) {
           this.listeners.delete(topic);
+          const activeSub = this.activeSubscriptions.get(topic);
+          if (activeSub) {
+            try {
+              activeSub.unsubscribe();
+            } catch (e) {
+              // ignore
+            }
+            this.activeSubscriptions.delete(topic);
+          }
         }
       }
     };
@@ -161,18 +177,27 @@ class WebSocketManager {
 
   private subscribeInternal(topic: string) {
     if (!this.client || this.status !== 'CONNECTED') return;
+    if (this.activeSubscriptions.has(topic)) return;
+
     try {
-      this.client.subscribe(topic, (message) => {
+      const sub = this.client.subscribe(topic, (message) => {
         try {
-          const parsed = JSON.parse(message.body);
+          const parsed = typeof message.body === 'string' ? JSON.parse(message.body) : message.body;
           const callbacks = this.listeners.get(topic);
           if (callbacks) {
-            callbacks.forEach((cb) => cb(parsed));
+            callbacks.forEach((cb) => {
+              try {
+                cb(parsed);
+              } catch (cbErr) {
+                console.error(`Error in STOMP callback for ${topic}:`, cbErr);
+              }
+            });
           }
         } catch (e) {
           console.error('Failed to parse STOMP message:', e);
         }
       });
+      this.activeSubscriptions.set(topic, sub);
     } catch (err) {
       console.warn('STOMP subscribe failure for', topic, err);
     }

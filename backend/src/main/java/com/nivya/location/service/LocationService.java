@@ -135,18 +135,26 @@ public class LocationService {
             }
         }
 
-        // 3. Update DeviceStatus lastSyncAt
+        // 3. Update DeviceStatus lastSyncAt and presence
+        device.setLastSeenAt(Instant.now());
+        deviceRepository.save(device);
+
         Optional<DeviceStatus> devStatusOpt = deviceStatusRepository.findByDeviceId(device.getId());
         if (devStatusOpt.isPresent()) {
             DeviceStatus devStatus = devStatusOpt.get();
             devStatus.setLastSyncAt(Instant.now());
+            devStatus.setOnline(true);
+            deviceStatusRepository.save(devStatus);
+        } else {
+            DeviceStatus devStatus = new DeviceStatus(device, true, null, "UNKNOWN", "UNKNOWN");
+            devStatus.setLastSyncAt(Instant.now());
             deviceStatusRepository.save(devStatus);
         }
 
-        // 3b. Stale Location Alert Handling
+        // 3. Handle Stale Location Alerts
         if (device.getFamily() != null) {
             boolean gpsAvail = Boolean.TRUE.equals(request.getIsGpsAvailable());
-            if (!gpsAvail || isStale) {
+            if (isStale) {
                 String devName = device.getDeviceName() != null ? device.getDeviceName() : "Device";
                 String reason = !gpsAvail ? "GPS is disabled" : "No location updates in >15m";
                 alertService.triggerOrUpdateAlert(
@@ -194,10 +202,9 @@ public class LocationService {
 
         validateDeviceAccess(device, principal);
 
-        LocationStatus status = locationStatusRepository.findByDeviceId(deviceId)
-                .orElseThrow(() -> new ResourceNotFoundException("No location data recorded for device: " + deviceId));
-
-        return mapToStatusResponse(status, device);
+        return locationStatusRepository.findByDeviceId(deviceId)
+                .map(status -> mapToStatusResponse(status, device))
+                .orElse(null);
     }
 
     @Transactional(readOnly = true)

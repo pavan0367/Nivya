@@ -300,4 +300,155 @@ class AuthIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401));
     }
+
+    @Test
+    @DisplayName("9. Child and Parent login returns authoritative persisted role")
+    void testChildAndParentLoginReturnsAuthoritativeRole() throws Exception {
+        // Register Child
+        RegisterRequest childReq = new RegisterRequest("Luna Child", "luna@nivya.local", "ChildPass123!", RoleType.CHILD);
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(childReq)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.user.role").value("CHILD"));
+
+        // Login as Child
+        LoginRequest childLogin = new LoginRequest("luna@nivya.local", "ChildPass123!");
+        MvcResult childLoginRes = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(childLogin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.user.role").value("CHILD"))
+                .andExpect(jsonPath("$.data.user.email").value("luna@nivya.local"))
+                .andReturn();
+
+        String childToken = objectMapper.readTree(childLoginRes.getResponse().getContentAsString())
+                .get("data").get("accessToken").asText();
+
+        // Verify /api/v1/auth/me returns persisted role CHILD
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + childToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.role").value("CHILD"))
+                .andExpect(jsonPath("$.data.email").value("luna@nivya.local"));
+
+        // Register Parent
+        RegisterRequest parentReq = new RegisterRequest("Mark Parent", "mark@nivya.local", "ParentPass123!", RoleType.PARENT);
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(parentReq)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.user.role").value("PARENT"));
+
+        // Login as Parent
+        LoginRequest parentLogin = new LoginRequest("mark@nivya.local", "ParentPass123!");
+        MvcResult parentLoginRes = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(parentLogin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.user.role").value("PARENT"))
+                .andExpect(jsonPath("$.data.user.email").value("mark@nivya.local"))
+                .andReturn();
+
+        String parentToken = objectMapper.readTree(parentLoginRes.getResponse().getContentAsString())
+                .get("data").get("accessToken").asText();
+
+        // Verify /api/v1/auth/me returns persisted role PARENT
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + parentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.role").value("PARENT"))
+                .andExpect(jsonPath("$.data.email").value("mark@nivya.local"));
+    }
+
+    @Test
+    @DisplayName("10. EMAIL_VERIFICATION_REQUIRED=false does not alter role behavior or persistence")
+    void testEmailVerificationBypassDoesNotAlterRoleBehavior() throws Exception {
+        RegisterRequest childReq = new RegisterRequest("Bypass Child", "bypass.child@nivya.local", "Password123!", RoleType.CHILD);
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(childReq)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.user.role").value("CHILD"));
+
+        // Directly authenticate without verifying email
+        LoginRequest loginReq = new LoginRequest("bypass.child@nivya.local", "Password123!");
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.user.role").value("CHILD"));
+    }
+
+    @Test
+    @DisplayName("11. Unknown email returns 401 Unauthorized with safe generic error message")
+    void testLoginWithUnknownEmailReturns401() throws Exception {
+        LoginRequest unknownUser = new LoginRequest("nonexistent.user@nivya.local", "SomePassword123!");
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(unknownUser)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.message").value("Invalid email or password"));
+    }
+
+    @Test
+    @DisplayName("12. Email normalization handles case insensitivity consistently")
+    void testEmailNormalizationWorksAcrossRegisterAndLogin() throws Exception {
+        // Register with mixed case: Normalized.Parent@Nivya.LOCAL
+        RegisterRequest regReq = new RegisterRequest("Norm User", "Normalized.Parent@Nivya.LOCAL", "SecurePass123!", RoleType.PARENT);
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(regReq)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.user.email").value("normalized.parent@nivya.local"));
+
+        // Login with lowercase: normalized.parent@nivya.local
+        LoginRequest loginReq1 = new LoginRequest("normalized.parent@nivya.local", "SecurePass123!");
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginReq1)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.user.email").value("normalized.parent@nivya.local"));
+
+        // Login with uppercase: NORMALIZED.PARENT@NIVYA.LOCAL
+        LoginRequest loginReq2 = new LoginRequest("NORMALIZED.PARENT@NIVYA.LOCAL", "SecurePass123!");
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginReq2)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.user.email").value("normalized.parent@nivya.local"));
+    }
+
+    @Test
+    @DisplayName("13. PasswordEncoder configured bean correctly validates registration and login")
+    void testPasswordEncoderCompatibility() throws Exception {
+        String rawPassword = "Complex_P@ssw0rd!#2026";
+        RegisterRequest reg = new RegisterRequest("BCrypt User", "bcrypt.test@nivya.local", rawPassword, RoleType.PARENT);
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(reg)))
+                .andExpect(status().isCreated());
+
+        User user = userRepository.findByEmail("bcrypt.test@nivya.local").orElseThrow();
+        // Assert password was encoded with standard BCrypt $2a$ or $2b$
+        assertTrue(user.getPasswordHash().startsWith("$2a$") || user.getPasswordHash().startsWith("$2b$"));
+        assertEquals(60, user.getPasswordHash().length());
+
+        // Assert login with exact password succeeds
+        LoginRequest validLogin = new LoginRequest("bcrypt.test@nivya.local", rawPassword);
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validLogin)))
+                .andExpect(status().isOk());
+
+        // Assert login with wrong password fails with 401
+        LoginRequest wrongLogin = new LoginRequest("bcrypt.test@nivya.local", "Wrong_Password!#2026");
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(wrongLogin)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid email or password"));
+    }
 }

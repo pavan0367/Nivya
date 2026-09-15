@@ -34,52 +34,7 @@ export const LiveActivityPage: React.FC = () => {
       if (data) {
         setActivityData(data);
       } else {
-        // Fallback demo state if backend returns empty
-        setActivityData({
-          deviceId: activeDeviceId,
-          deviceUuid: 'dev-demo-uuid',
-          deviceName: 'Child Phone',
-          online: true,
-          currentActivity: {
-            id: 101,
-            appName: 'WhatsApp',
-            broadActivity: 'Chatting with Arun',
-            category: 'Communication',
-            durationSeconds: 240,
-            durationFormatted: '4m',
-            startedAt: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
-          },
-          recentActivities: [
-            {
-              id: 100,
-              appName: 'Chrome',
-              broadActivity: 'Browsing educational portal',
-              category: 'Education',
-              durationSeconds: 900,
-              durationFormatted: '15m',
-              startedAt: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
-            },
-            {
-              id: 99,
-              appName: 'Files',
-              broadActivity: 'Viewing biology_homework.pdf',
-              category: 'Productivity',
-              durationSeconds: 480,
-              durationFormatted: '8m',
-              startedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-            },
-            {
-              id: 98,
-              appName: 'YouTube Kids',
-              broadActivity: 'Watching science documentary',
-              category: 'Entertainment',
-              durationSeconds: 1200,
-              durationFormatted: '20m',
-              startedAt: new Date(Date.now() - 55 * 60 * 1000).toISOString(),
-            },
-          ],
-          lastUpdatedAt: new Date().toISOString(),
-        });
+        setActivityData(null);
       }
     } catch (err: any) {
       console.error('Failed to load live activity:', err);

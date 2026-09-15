@@ -44,7 +44,7 @@ public class BatteryController {
             @PathVariable Long deviceId) {
 
         BatteryStatusResponse response = batteryService.getCurrentBattery(deviceId, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Battery status retrieved"));
+        return ResponseEntity.ok(ApiResponse.success(response, response != null ? "Battery status retrieved" : "No battery telemetry recorded yet"));
     }
 
     @GetMapping("/history/{deviceId}")

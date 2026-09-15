@@ -5,6 +5,10 @@ import java.time.Instant;
 public class DeviceStatusDto {
 
     private Long deviceId;
+    private Long id;
+    private Long userId;
+    private String userRole;
+    private boolean isChildDevice;
     private String deviceUuid;
     private String deviceName;
     private String platform;
@@ -23,6 +27,7 @@ public class DeviceStatusDto {
                            boolean isOnline, Integer batteryPct, String networkType,
                            String networkQuality, Instant lastSyncAt, Instant lastSeenAt, boolean isStale) {
         this.deviceId = deviceId;
+        this.id = deviceId;
         this.deviceUuid = deviceUuid;
         this.deviceName = deviceName;
         this.platform = platform;
@@ -121,5 +126,37 @@ public class DeviceStatusDto {
 
     public void setStale(boolean stale) {
         isStale = stale;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
+    }
+
+    public String getUserRole() {
+        return userRole;
+    }
+
+    public void setUserRole(String userRole) {
+        this.userRole = userRole;
+    }
+
+    public boolean isChildDevice() {
+        return isChildDevice;
+    }
+
+    public void setIsChildDevice(boolean childDevice) {
+        isChildDevice = childDevice;
     }
 }

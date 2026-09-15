@@ -15,4 +15,8 @@ public interface DeviceSessionRepository extends JpaRepository<DeviceSession, Lo
     Optional<DeviceSession> findFirstByUserIdAndDeviceFingerprintAndStatus(Long userId, String deviceFingerprint, String status);
 
     long countByUserIdAndDeviceFingerprint(Long userId, String deviceFingerprint);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @org.springframework.data.jpa.repository.Query("DELETE FROM DeviceSession d WHERE d.user.id = :userId")
+    void deleteByUserId(@org.springframework.data.repository.query.Param("userId") Long userId);
 }

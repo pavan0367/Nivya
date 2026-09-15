@@ -42,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Comprehensive Integration Tests for the Nivya 10-Step Pairing System.
  */
-@SpringBootTest
+@SpringBootTest(classes = com.nivya.NivyaApplication.class)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class PairingIntegrationTest {

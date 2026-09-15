@@ -324,6 +324,12 @@ class DeviceHealthIntegrationTest {
     @Test
     @DisplayName("Child can query own device health via /my endpoint")
     void testChildCanRetrieveOwnDeviceHealth_Success() throws Exception {
+        DeviceHealth health = new DeviceHealth(childDevice, Instant.now());
+        health.setDeviceModel("Samsung SM-A546B");
+        health.setHealthScore(90);
+        health.setHealthStatus("GOOD");
+        deviceHealthRepository.save(health);
+
         mockMvc.perform(get("/api/v1/device/health/my")
                         .header("Authorization", "Bearer " + childToken))
                 .andExpect(status().isOk())

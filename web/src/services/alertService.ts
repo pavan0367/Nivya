@@ -17,6 +17,15 @@ export const alertService = {
     return response.data.data || { unreadCount: 0 };
   },
 
+  async getChildAlerts(): Promise<Alert[]> {
+    const response = await apiClient.get<ApiResponse<Alert[]>>('/alerts/my');
+    return response.data.data || [];
+  },
+
+  async getAlerts(_deviceId?: number): Promise<Alert[]> {
+    return this.getChildAlerts();
+  },
+
   async markAsRead(alertId: number): Promise<void> {
     await apiClient.post(`/alerts/${alertId}/read`);
   },

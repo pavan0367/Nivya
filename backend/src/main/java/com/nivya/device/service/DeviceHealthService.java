@@ -157,7 +157,10 @@ public class DeviceHealthService {
 
         DeviceHealth savedHealth = deviceHealthRepository.save(health);
 
-        // 6. Update overarching DeviceStatus
+        // 6. Update overarching DeviceStatus and device presence
+        device.setLastSeenAt(Instant.now());
+        deviceRepository.save(device);
+
         Optional<DeviceStatus> statusOpt = deviceStatusRepository.findByDeviceId(device.getId());
         if (statusOpt.isPresent()) {
             DeviceStatus ds = statusOpt.get();
@@ -169,7 +172,14 @@ public class DeviceHealthService {
             }
             if (request.getIsOnline() != null) {
                 ds.setOnline(request.getIsOnline());
+            } else {
+                ds.setOnline(true);
             }
+            ds.setLastSyncAt(Instant.now());
+            deviceStatusRepository.save(ds);
+        } else {
+            boolean online = request.getIsOnline() != null ? request.getIsOnline() : true;
+            DeviceStatus ds = new DeviceStatus(device, online, request.getBatteryPct(), request.getNetworkType(), "GOOD");
             ds.setLastSyncAt(Instant.now());
             deviceStatusRepository.save(ds);
         }
@@ -204,10 +214,9 @@ public class DeviceHealthService {
 
         validateDeviceAccess(device, principal);
 
-        DeviceHealth health = deviceHealthRepository.findByDeviceId(deviceId)
-                .orElseGet(() -> createDefaultHealth(device));
-
-        return mapToResponse(health, device);
+        return deviceHealthRepository.findByDeviceId(deviceId)
+                .map(health -> mapToResponse(health, device))
+                .orElse(null);
     }
 
     @Transactional(readOnly = true)
@@ -226,13 +235,12 @@ public class DeviceHealthService {
         if (device.getFamily() == null) return;
         if (isLowStorage) {
             long freeGb = freeStorage / (1024 * 1024 * 1024);
-            String severity = freeStorage < (totalStorage * 0.05) ? "CRITICAL" : "WARNING";
             String devName = device.getDeviceName() != null ? device.getDeviceName() : "Device";
             alertService.triggerOrUpdateAlert(
                     device.getFamily(),
                     device,
                     "LOW_STORAGE",
-                    severity,
+                    "WARNING",
                     "Low Storage Warning",
                     devName + " is running low on storage (" + freeGb + " GB free). Consider freeing up space.",
                     "ALL"
@@ -269,35 +277,6 @@ public class DeviceHealthService {
     private void validateDeviceAccess(Device device, UserPrincipal principal) {
         if (principal == null) return;
         deviceAccessValidator.validateDeviceAccess(device, principal);
-    }
-
-    private DeviceHealth createDefaultHealth(Device device) {
-        DeviceHealth defaultHealth = new DeviceHealth(device, Instant.now());
-        defaultHealth.setHealthScore(95);
-        defaultHealth.setHealthStatus("HEALTHY");
-        defaultHealth.setBatteryPct(85);
-        defaultHealth.setChargingState("NOT_CHARGING");
-        defaultHealth.setBatteryHealth("GOOD");
-        defaultHealth.setStorageTotalBytes(128_000_000_000L);
-        defaultHealth.setStorageUsedBytes(48_000_000_000L);
-        defaultHealth.setStorageFreeBytes(80_000_000_000L);
-        defaultHealth.setRamTotalBytes(8_000_000_000L);
-        defaultHealth.setRamUsedBytes(3_500_000_000L);
-        defaultHealth.setRamFreeBytes(4_500_000_000L);
-        defaultHealth.setLowRam(false);
-        defaultHealth.setDeviceModel(device.getDeviceName());
-        defaultHealth.setDeviceManufacturer("Android OEM");
-        defaultHealth.setOsVersion(device.getOsVersion() != null ? device.getOsVersion() : "14");
-        defaultHealth.setSdkVersion(34);
-        defaultHealth.setNetworkType("WIFI");
-        defaultHealth.setOnline(true);
-        defaultHealth.setLocationPermission("GRANTED");
-        defaultHealth.setUsagePermission("GRANTED");
-        defaultHealth.setNotificationPermission("GRANTED");
-        defaultHealth.setBatteryOptimization("OPTIMIZED");
-        defaultHealth.setAllPermissionsHealthy(true);
-        defaultHealth.setSyncState("SYNCED");
-        return defaultHealth;
     }
 
     private DeviceHealthResponse mapToResponse(DeviceHealth health, Device device) {

@@ -94,7 +94,10 @@ public class NetworkService {
         status.setUpdatedAt(Instant.now());
         networkStatusRepository.save(status);
 
-        // 2. Synchronize overarching DeviceStatus (online status, network type, network quality)
+        // 2. Synchronize overarching DeviceStatus and device presence
+        device.setLastSeenAt(Instant.now());
+        deviceRepository.save(device);
+
         Optional<DeviceStatus> deviceStatusOpt = deviceStatusRepository.findByDeviceId(device.getId());
         boolean wasOffline = deviceStatusOpt.isPresent() && !deviceStatusOpt.get().isOnline();
         if (deviceStatusOpt.isPresent()) {
@@ -102,6 +105,10 @@ public class NetworkService {
             ds.setOnline(isNetAvail && isInternetAvail);
             ds.setNetworkType(netType);
             ds.setNetworkQuality(quality);
+            ds.setLastSyncAt(Instant.now());
+            deviceStatusRepository.save(ds);
+        } else {
+            DeviceStatus ds = new DeviceStatus(device, (isNetAvail && isInternetAvail), null, netType, quality);
             ds.setLastSyncAt(Instant.now());
             deviceStatusRepository.save(ds);
         }
@@ -160,10 +167,9 @@ public class NetworkService {
 
         validateDeviceAccess(device, principal);
 
-        NetworkStatus status = networkStatusRepository.findByDeviceId(deviceId)
-                .orElseGet(() -> new NetworkStatus(device, "NONE", "Offline", false, false, 0, null, "UNAVAILABLE", null, null));
-
-        return toResponse(status);
+        return networkStatusRepository.findByDeviceId(deviceId)
+                .map(this::toResponse)
+                .orElse(null);
     }
 
     @Transactional(readOnly = true)

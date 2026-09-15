@@ -44,6 +44,15 @@ public class ConvocationMessage {
     @Column(nullable = false, length = 30)
     private String status = "UNREAD";
 
+    @Column(name = "is_pinned", nullable = false)
+    private boolean isPinned = false;
+
+    @Column(name = "reaction", length = 64)
+    private String reaction;
+
+    @Column(name = "reply_to_id")
+    private Long replyToId;
+
     public ConvocationMessage() {
     }
 
@@ -160,5 +169,29 @@ public class ConvocationMessage {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public boolean isPinned() {
+        return isPinned;
+    }
+
+    public void setPinned(boolean pinned) {
+        isPinned = pinned;
+    }
+
+    public String getReaction() {
+        return reaction;
+    }
+
+    public void setReaction(String reaction) {
+        this.reaction = reaction;
+    }
+
+    public Long getReplyToId() {
+        return replyToId;
+    }
+
+    public void setReplyToId(Long replyToId) {
+        this.replyToId = replyToId;
     }
 }

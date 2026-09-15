@@ -35,30 +35,32 @@ export const LoginPage: React.FC = () => {
 
     try {
       const data = await authService.login(email, password);
+      const userRole = data.user.role;
 
-      if (data.user.role !== 'PARENT') {
-        navigate('/access-denied', { replace: true });
+      if (userRole === 'CHILD') {
+        // Authoritative Child role: always land on Child starting/index page (/child)
+        navigate('/child', { replace: true });
         return;
       }
 
-      // Check pairing / relationship state to differentiate First-Time vs Already-Paired
+      // PARENT LOGIN: Check pairing state to differentiate already-paired vs setup-incomplete
       try {
         const pairingStatus = await authService.getPairingStatus();
         if (pairingStatus.paired) {
-          // ALREADY PAIRED USER: Direct to dashboard
-          const origin = (location.state as any)?.from?.pathname || '/dashboard';
-          navigate(origin, { replace: true });
+          // ALREADY PAIRED PARENT: Direct to parent dashboard
+          const origin = (location.state as any)?.from?.pathname;
+          const target = (origin && origin !== '/access-denied' && !origin.startsWith('/child')) ? origin : '/dashboard';
+          navigate(target, { replace: true });
         } else {
-          // FIRST-TIME / SETUP-INCOMPLETE USER: Route to Role Selection
-          navigate('/role-selection', { replace: true });
+          // UNPAIRED PARENT: Route to pairing
+          navigate('/pairing', { replace: true });
         }
       } catch (pairErr) {
         console.warn('Could not determine live pairing status; checking local state:', pairErr);
-        // TEMPORARILY OFFLINE: If previously paired, preserve dashboard access
         if (authService.isPaired()) {
           navigate('/dashboard', { replace: true });
         } else {
-          navigate('/role-selection', { replace: true });
+          navigate('/pairing', { replace: true });
         }
       }
     } catch (err: any) {
@@ -164,7 +166,7 @@ export const LoginPage: React.FC = () => {
               type="email"
               className="form-input"
               style={{ paddingLeft: '2.75rem' }}
-              placeholder="parent@example.com"
+              placeholder="user@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required

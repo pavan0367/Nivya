@@ -617,11 +617,21 @@ public class PairingService {
             String netQuality = optStatus.map(DeviceStatus::getNetworkQuality).orElse("UNKNOWN");
             Instant lastSync = optStatus.map(DeviceStatus::getLastSyncAt).orElse(d.getLastSeenAt());
             Instant lastSeen = d.getLastSeenAt() != null ? d.getLastSeenAt() : lastSync;
+            if (lastSync != null && (lastSeen == null || lastSync.isAfter(lastSeen))) {
+                lastSeen = lastSync;
+            }
 
-            // Device is considered stale if offline OR hasn't reported within 2 minutes
-            boolean isStale = !isOnline || (lastSeen != null && lastSeen.isBefore(twoMinutesAgo));
+            // Authoritative stale and online status evaluation
+            boolean isReported = (lastSeen != null);
+            boolean isStale = isReported && lastSeen.isBefore(twoMinutesAgo);
+            if (!isReported) {
+                isOnline = false;
+                isStale = false;
+            } else if (isStale) {
+                isOnline = false;
+            }
 
-            deviceDtos.add(new DeviceStatusDto(
+            DeviceStatusDto dto = new DeviceStatusDto(
                     d.getId(),
                     d.getDeviceUuid(),
                     d.getDeviceName(),
@@ -633,7 +643,16 @@ public class PairingService {
                     lastSync,
                     lastSeen,
                     isStale
-            ));
+            );
+            dto.setId(d.getId());
+            if (d.getUser() != null) {
+                dto.setUserId(d.getUser().getId());
+                if (d.getUser().getRole() != null) {
+                    dto.setUserRole(d.getUser().getRole().name());
+                    dto.setIsChildDevice(d.getUser().getRole() == RoleType.CHILD);
+                }
+            }
+            deviceDtos.add(dto);
         }
 
         return new PairingStatusResponse(

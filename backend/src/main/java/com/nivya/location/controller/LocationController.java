@@ -43,7 +43,7 @@ public class LocationController {
             @PathVariable Long deviceId,
             @AuthenticationPrincipal UserPrincipal principal) {
         LocationStatusResponse response = locationService.getCurrentLocation(deviceId, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Current location retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, response != null ? "Current location retrieved successfully" : "No location data recorded yet"));
     }
 
     @GetMapping("/history/{deviceId}")

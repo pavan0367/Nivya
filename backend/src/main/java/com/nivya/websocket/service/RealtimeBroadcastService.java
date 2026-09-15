@@ -100,6 +100,11 @@ public class RealtimeBroadcastService {
         }
     }
 
+    public void broadcastConvocationAction(Long familyId, Object actionPayload) {
+        String topic = "/topic/convocation/actions";
+        publishEvent(RealtimeEventType.CONVOCATION_EVENT, topic, familyId, null, actionPayload);
+    }
+
     public void broadcastLiveActivity(Long deviceId, Long familyId, Object activityDto) {
         String topic = "/topic/activity/" + deviceId;
         publishEvent(RealtimeEventType.ACTIVITY_UPDATE, topic, familyId, deviceId, activityDto);

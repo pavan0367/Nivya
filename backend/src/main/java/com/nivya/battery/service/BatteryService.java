@@ -90,11 +90,19 @@ public class BatteryService {
         status.setUpdatedAt(Instant.now());
         batteryStatusRepository.save(status);
 
-        // 2. Synchronize DeviceStatus.batteryPct for overarching telemetry queries
+        // 2. Synchronize DeviceStatus and Device presence for overarching telemetry queries
+        device.setLastSeenAt(Instant.now());
+        deviceRepository.save(device);
+
         Optional<DeviceStatus> deviceStatusOpt = deviceStatusRepository.findByDeviceId(device.getId());
         if (deviceStatusOpt.isPresent()) {
             DeviceStatus ds = deviceStatusOpt.get();
             ds.setBatteryPct(pct);
+            ds.setLastSyncAt(Instant.now());
+            ds.setOnline(true);
+            deviceStatusRepository.save(ds);
+        } else {
+            DeviceStatus ds = new DeviceStatus(device, true, pct, "UNKNOWN", "UNKNOWN");
             ds.setLastSyncAt(Instant.now());
             deviceStatusRepository.save(ds);
         }
@@ -139,10 +147,9 @@ public class BatteryService {
                 .orElseThrow(() -> new ResourceNotFoundException("Device not found with ID: " + deviceId));
         validateDeviceAccess(device, principal);
 
-        BatteryStatus status = batteryStatusRepository.findByDeviceId(deviceId)
-                .orElseThrow(() -> new ResourceNotFoundException("No battery telemetry recorded for device ID: " + deviceId));
-
-        return mapToResponse(status);
+        return batteryStatusRepository.findByDeviceId(deviceId)
+                .map(this::mapToResponse)
+                .orElse(null);
     }
 
     @Transactional(readOnly = true)

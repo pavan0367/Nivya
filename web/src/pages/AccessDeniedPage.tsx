@@ -83,17 +83,32 @@ export const AccessDeniedPage: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+          {user?.role === 'CHILD' ? (
+            <button
+              type="button"
+              id="btn-return-child-home"
+              className="btn btn-primary"
+              onClick={() => navigate('/child')}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <ArrowLeft size={16} />
+              Return to Child Home
+            </button>
+          ) : (
+            <button
+              type="button"
+              id="btn-return-home"
+              className="btn btn-primary"
+              onClick={() => navigate('/')}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <ArrowLeft size={16} />
+              Return to Home
+            </button>
+          )}
           <button
             type="button"
-            className="btn btn-secondary"
-            onClick={() => navigate('/role-selection')}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-          >
-            <ArrowLeft size={16} />
-            Switch Role
-          </button>
-          <button
-            type="button"
+            id="btn-access-denied-logout"
             className="btn btn-danger"
             onClick={handleLogout}
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}

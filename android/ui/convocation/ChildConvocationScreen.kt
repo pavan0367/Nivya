@@ -12,6 +12,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,6 +39,19 @@ fun ChildConvocationScreen(
     val uiState by viewModel.uiState.collectAsState()
     var showMenu by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
+    val focusRequester = remember { FocusRequester() }
+    var wasSendingNote by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.isSendingNote) {
+        if (wasSendingNote && !uiState.isSendingNote) {
+            try {
+                focusRequester.requestFocus()
+            } catch (e: Exception) {
+                // Focus requester may not be attached yet
+            }
+        }
+        wasSendingNote = uiState.isSendingNote
+    }
 
     Column(
         modifier = modifier
@@ -167,7 +182,8 @@ fun ChildConvocationScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 160.dp),
+                        .heightIn(min = 160.dp)
+                        .focusRequester(focusRequester),
                     shape = RoundedCornerShape(10.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = PurpleAccent,
@@ -195,7 +211,14 @@ fun ChildConvocationScreen(
                     }
 
                     Button(
-                        onClick = { viewModel.sendChildNote() },
+                        onClick = {
+                            viewModel.sendChildNote()
+                            try {
+                                focusRequester.requestFocus()
+                            } catch (e: Exception) {
+                                // Ignored
+                            }
+                        },
                         enabled = uiState.noteText.isNotBlank() && !uiState.isSendingNote,
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = PurpleAccent)

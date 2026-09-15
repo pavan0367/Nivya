@@ -26,7 +26,7 @@ export const RoleSelectPage: React.FC = () => {
       if (selectedRole === 'PARENT') {
         navigate('/pairing');
       } else {
-        navigate('/access-denied');
+        navigate('/child');
       }
     } finally {
       setLoading(false);
@@ -180,7 +180,7 @@ export const RoleSelectPage: React.FC = () => {
         >
           <ShieldAlert size={18} style={{ flexShrink: 0 }} />
           <span>
-            Notice: Choosing the Child role will block access to the web dashboard and redirect to the privacy enforcement notice.
+            Notice: Choosing the Child role provides child safety telemetry, device protections, and priority emergency channels (CRACK / FREAK).
           </span>
         </div>
       )}

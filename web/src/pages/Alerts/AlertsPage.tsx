@@ -14,6 +14,7 @@ import { LoadingSpinner } from '../../components/common/LoadingState';
 import { EmptyState } from '../../components/common/EmptyState';
 import { ErrorBanner } from '../../components/common/ErrorState';
 import { alertService } from '../../services/alertService';
+import { authService } from '../../services/authService';
 import { websocketService } from '../../services/websocketService';
 import { Alert, Severity } from '../../types/alerts';
 
@@ -26,9 +27,28 @@ export const AlertsPage: React.FC = () => {
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
   const [unreadOnly, setUnreadOnly] = useState<boolean>(false);
 
-  const familyId = 1; // Default family context
+  const [familyId, setFamilyId] = useState<number | null>(() => {
+    const saved = localStorage.getItem('nivya_family_id');
+    return saved ? parseInt(saved, 10) : null;
+  });
+
+  useEffect(() => {
+    if (!familyId) {
+      authService.getPairingStatus().then((status) => {
+        if (status.familyId) {
+          setFamilyId(status.familyId);
+          localStorage.setItem('nivya_family_id', String(status.familyId));
+        }
+      }).catch(() => {});
+    }
+  }, [familyId]);
 
   const loadAlerts = useCallback(async (isInitial = false) => {
+    if (!familyId) {
+      if (isInitial) setLoading(false);
+      return;
+    }
+
     if (isInitial) setLoading(true);
     else setRefreshing(true);
     setError(null);
@@ -43,51 +63,7 @@ export const AlertsPage: React.FC = () => {
       if (data && data.length > 0) {
         setAlerts(data);
       } else {
-        // Fallback demo alerts if backend returns empty
-        setAlerts([
-          {
-            id: 201,
-            familyId: 1,
-            deviceId: 1,
-            alertType: 'BATTERY_LOW',
-            severity: 'WARNING',
-            title: 'Low Battery Warning',
-            message: 'Target device battery dropped below 15% (currently at 12%).',
-            targetRole: 'PARENT',
-            isRead: false,
-            resolved: false,
-            createdAt: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
-          },
-          {
-            id: 202,
-            familyId: 1,
-            deviceId: 1,
-            alertType: 'NETWORK_DISCONNECTED',
-            severity: 'CRITICAL',
-            title: 'Device Offline',
-            message: 'Target device disconnected from cellular/Wi-Fi for over 15 minutes.',
-            targetRole: 'PARENT',
-            isRead: true,
-            resolved: false,
-            createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-            readAt: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
-          },
-          {
-            id: 203,
-            familyId: 1,
-            deviceId: 1,
-            alertType: 'SAFE_ZONE_ENTRY',
-            severity: 'INFO',
-            title: 'Safe Zone Reached',
-            message: 'Child device entered Primary Safe Zone (Home).',
-            targetRole: 'PARENT',
-            isRead: true,
-            resolved: true,
-            createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-            readAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-            resolvedAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-          },
-        ]);
+        setAlerts([]);
       }
     } catch (err: any) {
       console.error('Failed to load alerts:', err);
@@ -99,14 +75,16 @@ export const AlertsPage: React.FC = () => {
   }, [familyId, unreadOnly, severityFilter]);
 
   useEffect(() => {
-    loadAlerts(true);
+    if (familyId) {
+      loadAlerts(true);
 
-    // Subscribe to STOMP WebSocket for incoming real-time alerts
-    const unsub = websocketService.subscribe(`/topic/alerts/${familyId}`, (newAlert: Alert) => {
-      setAlerts((prev) => [newAlert, ...prev]);
-    });
+      // Subscribe to STOMP WebSocket for incoming real-time alerts
+      const unsub = websocketService.subscribe(`/topic/alerts/${familyId}`, (newAlert: Alert) => {
+        setAlerts((prev) => [newAlert, ...prev]);
+      });
 
-    return () => unsub();
+      return () => unsub();
+    }
   }, [familyId, loadAlerts]);
 
   const handleMarkAsRead = async (alertId: number) => {

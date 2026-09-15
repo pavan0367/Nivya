@@ -44,7 +44,7 @@ export const RegisterPage: React.FC = () => {
     setLoading(true);
 
     try {
-      await authService.register(name.trim(), email.trim().toLowerCase(), password, role);
+      const data = await authService.register(name.trim(), email.trim().toLowerCase(), password, role);
 
       // Clear auto-saved auth tokens so user explicitly logs in on Login page
       localStorage.removeItem('nivya_access_token');
@@ -52,16 +52,33 @@ export const RegisterPage: React.FC = () => {
       localStorage.removeItem('nivya_user_role');
       localStorage.removeItem('nivya_user');
 
-      setSuccessMessage('Account created! A verification code has been dispatched to your email.');
+      // Check whether email verification gate is active
+      // In development mode (or when user status is already ACTIVE), route directly to Login
+      const isVerificationRequired =
+        import.meta.env.VITE_EMAIL_VERIFICATION_REQUIRED !== 'false' &&
+        data?.user?.status === 'PENDING';
 
-      setTimeout(() => {
-        navigate(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}`, {
-          replace: true,
-          state: {
-            email: email.trim().toLowerCase(),
-          },
-        });
-      }, 1000);
+      if (isVerificationRequired) {
+        setSuccessMessage('Account created! A verification code has been dispatched to your email.');
+        setTimeout(() => {
+          navigate(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}`, {
+            replace: true,
+            state: {
+              email: email.trim().toLowerCase(),
+            },
+          });
+        }, 1000);
+      } else {
+        setSuccessMessage('Account created successfully! Redirecting to login...');
+        setTimeout(() => {
+          navigate('/login', {
+            replace: true,
+            state: {
+              email: email.trim().toLowerCase(),
+            },
+          });
+        }, 1000);
+      }
     } catch (err: any) {
       console.error('Registration failed:', err);
       const serverMessage = err.response?.data?.message;

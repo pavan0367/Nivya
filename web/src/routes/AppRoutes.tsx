@@ -2,8 +2,10 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { DashboardLayout } from '../layouts/DashboardLayout';
+import { ChildLayout } from '../layouts/ChildLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleRoute } from './RoleRoute';
+import { authService } from '../services/authService';
 
 // Pages
 import { LoginPage } from '../pages/Login/LoginPage';
@@ -22,6 +24,34 @@ import { AlertsPage } from '../pages/Alerts/AlertsPage';
 import { ConvocationPage } from '../pages/Convocation/ConvocationPage';
 import { SettingsPage } from '../pages/Settings/SettingsPage';
 
+// Child Pages
+import { ChildDashboardPage } from '../pages/ChildDashboard/ChildDashboardPage';
+import { ChildBatteryPage } from '../pages/ChildDashboard/ChildBatteryPage';
+import { ChildScreenTimePage } from '../pages/ChildDashboard/ChildScreenTimePage';
+import { ChildNetworkPage } from '../pages/ChildDashboard/ChildNetworkPage';
+import { ChildNetworkQualityPage } from '../pages/ChildDashboard/ChildNetworkQualityPage';
+import { ChildLocationPage } from '../pages/ChildDashboard/ChildLocationPage';
+import { ChildDeviceHealthPage } from '../pages/ChildDashboard/ChildDeviceHealthPage';
+import { ChildAlertsPage } from '../pages/ChildDashboard/ChildAlertsPage';
+import { ChildConvocationPage } from '../pages/ChildDashboard/ChildConvocationPage';
+
+/**
+ * Role-aware landing selector.
+ * Guarantees Child accounts land directly on /child,
+ * Parent accounts land directly on /dashboard,
+ * and unauthenticated sessions land on /login.
+ */
+export const RoleAwareLanding: React.FC = () => {
+  if (!authService.isAuthenticated()) {
+    return <Navigate to="/login" replace />;
+  }
+  const role = authService.getUserRole();
+  if (role === 'CHILD') {
+    return <Navigate to="/child" replace />;
+  }
+  return <Navigate to="/dashboard" replace />;
+};
+
 export const AppRoutes: React.FC = () => {
   return (
     <Routes>
@@ -36,10 +66,29 @@ export const AppRoutes: React.FC = () => {
       {/* Role access restriction notice */}
       <Route path="/access-denied" element={<AccessDeniedPage />} />
 
-      {/* Protected Parent-Only Routes */}
+      {/* Protected Routes */}
       <Route element={<ProtectedRoute />}>
+        {/* Pairing is accessible to both Parent and Child */}
+        <Route path="/pairing" element={<PairingScreen />} />
+
+        {/* Child Experience & Detail Routes */}
+        <Route element={<RoleRoute allowedRoles={['CHILD']} />}>
+          <Route element={<ChildLayout />}>
+            <Route path="/child" element={<ChildDashboardPage />} />
+            <Route path="/child/battery" element={<ChildBatteryPage />} />
+            <Route path="/child/screen-time" element={<ChildScreenTimePage />} />
+            <Route path="/child/network" element={<ChildNetworkPage />} />
+            <Route path="/child/network-quality" element={<ChildNetworkQualityPage />} />
+            <Route path="/child/location" element={<ChildLocationPage />} />
+            <Route path="/child/device-health" element={<ChildDeviceHealthPage />} />
+            <Route path="/child/alerts" element={<ChildAlertsPage />} />
+            <Route path="/child/convocation" element={<ChildConvocationPage />} />
+            <Route path="/child/settings" element={<SettingsPage />} />
+          </Route>
+        </Route>
+
+        {/* Parent-Only Routes */}
         <Route element={<RoleRoute allowedRoles={['PARENT']} />}>
-          <Route path="/pairing" element={<PairingScreen />} />
           <Route element={<DashboardLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/live-activity" element={<LiveActivityPage />} />
@@ -54,9 +103,9 @@ export const AppRoutes: React.FC = () => {
         </Route>
       </Route>
 
-      {/* Root redirect */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* Role-aware root and fallback redirect */}
+      <Route path="/" element={<RoleAwareLanding />} />
+      <Route path="*" element={<RoleAwareLanding />} />
     </Routes>
   );
 };

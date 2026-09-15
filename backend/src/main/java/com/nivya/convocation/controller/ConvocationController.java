@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,6 +33,7 @@ public class ConvocationController {
     // =========================================================================
 
     @PostMapping("/parent/send")
+    @PreAuthorize("hasRole('PARENT')")
     @Operation(summary = "Send Convocation message (Parent only)", description = "Sends a priority guidance message to Child device")
     public ResponseEntity<ApiResponse<ParentConvocationMessageDto>> parentSendMessage(
             @Valid @RequestBody ParentSendMessageRequest request,
@@ -41,6 +43,7 @@ public class ConvocationController {
     }
 
     @GetMapping("/parent/history")
+    @PreAuthorize("hasRole('PARENT')")
     @Operation(summary = "Get retained history (Parent only)", description = "Retrieves complete, permanent retained history for family")
     public ResponseEntity<ApiResponse<List<ParentConvocationMessageDto>>> parentGetRetainedHistory(
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -49,6 +52,7 @@ public class ConvocationController {
     }
 
     @GetMapping("/parent/seen")
+    @PreAuthorize("hasRole('PARENT')")
     @Operation(summary = "Get Seen status map (Parent only)", description = "Retrieves Seen state map of sent messages")
     public ResponseEntity<ApiResponse<Map<Long, Boolean>>> parentGetSeenState(
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -56,11 +60,44 @@ public class ConvocationController {
         return ResponseEntity.ok(ApiResponse.success(seenMap, "Seen state retrieved successfully"));
     }
 
+    @PostMapping("/parent/message/{messageId}/unsend")
+    @PreAuthorize("hasRole('PARENT')")
+    @Operation(summary = "Unsend message (Parent only)", description = "Unsends a Parent-owned message and removes it from visible conversation")
+    public ResponseEntity<ApiResponse<Void>> parentUnsendMessage(
+            @PathVariable Long messageId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        convocationService.parentUnsendMessage(principal, messageId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Message unsent successfully"));
+    }
+
+    @PostMapping("/parent/message/{messageId}/pin")
+    @PreAuthorize("hasRole('PARENT')")
+    @Operation(summary = "Toggle pin message (Parent only)", description = "Toggles pin status of a message")
+    public ResponseEntity<ApiResponse<ParentConvocationMessageDto>> parentTogglePinMessage(
+            @PathVariable Long messageId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        ParentConvocationMessageDto dto = convocationService.parentTogglePinMessage(principal, messageId);
+        return ResponseEntity.ok(ApiResponse.success(dto, "Message pin status updated"));
+    }
+
+    @PostMapping("/parent/message/{messageId}/react")
+    @PreAuthorize("hasRole('PARENT')")
+    @Operation(summary = "React to message (Parent only)", description = "Adds or updates reaction on a message")
+    public ResponseEntity<ApiResponse<ParentConvocationMessageDto>> parentReactToMessage(
+            @PathVariable Long messageId,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        String reaction = body != null ? body.get("reaction") : null;
+        ParentConvocationMessageDto dto = convocationService.parentReactToMessage(principal, messageId, reaction);
+        return ResponseEntity.ok(ApiResponse.success(dto, "Reaction updated"));
+    }
+
     // =========================================================================
     // CHILD ENDPOINTS
     // =========================================================================
 
     @GetMapping("/child/unread")
+    @PreAuthorize("hasRole('CHILD')")
     @Operation(summary = "Get unread messages (Child only)", description = "Retrieves currently unread messages without revealing Seen state")
     public ResponseEntity<ApiResponse<List<ChildConvocationMessageDto>>> childGetUnreadMessages(
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -69,6 +106,7 @@ public class ConvocationController {
     }
 
     @PostMapping("/child/view/start")
+    @PreAuthorize("hasRole('CHILD')")
     @Operation(summary = "Start 2-minute viewing session (Child only)", description = "Activates viewing for all currently unread messages with 2-minute server expiration")
     public ResponseEntity<ApiResponse<ChildViewingSessionResponse>> childStartViewing(
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -77,6 +115,7 @@ public class ConvocationController {
     }
 
     @PostMapping("/child/send")
+    @PreAuthorize("hasRole('CHILD')")
     @Operation(summary = "Send note to parent (Child only)", description = "Sends message that disappears from child view and is retained by parent")
     public ResponseEntity<ApiResponse<Map<String, Object>>> childSendMessage(
             @Valid @RequestBody ChildSendMessageRequest request,
@@ -86,6 +125,7 @@ public class ConvocationController {
     }
 
     @GetMapping("/child/visibility")
+    @PreAuthorize("hasRole('CHILD')")
     @Operation(summary = "Get visibility state (Child only)", description = "Retrieves current viewing session status and countdown")
     public ResponseEntity<ApiResponse<ChildVisibilityStateResponse>> childGetVisibilityState(
             @AuthenticationPrincipal UserPrincipal principal) {

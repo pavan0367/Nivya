@@ -15,6 +15,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -34,6 +36,19 @@ fun ParentConvocationScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
+    val focusRequester = remember { FocusRequester() }
+    var wasSending by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.isSending) {
+        if (wasSending && !uiState.isSending) {
+            try {
+                focusRequester.requestFocus()
+            } catch (e: Exception) {
+                // Focus requester may not be attached yet
+            }
+        }
+        wasSending = uiState.isSending
+    }
 
     LaunchedEffect(uiState.messages.size) {
         if (uiState.messages.isNotEmpty()) {
@@ -124,7 +139,9 @@ fun ParentConvocationScreen(
                     value = uiState.inputMessage,
                     onValueChange = { viewModel.updateInput(it) },
                     placeholder = { Text("Send priority message to child...", color = TextMuted) },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .focusRequester(focusRequester),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = PurpleAccent,
                         unfocusedBorderColor = Color.Transparent,
@@ -137,7 +154,14 @@ fun ParentConvocationScreen(
                 Spacer(modifier = Modifier.width(8.dp))
 
                 IconButton(
-                    onClick = { viewModel.sendMessage() },
+                    onClick = {
+                        viewModel.sendMessage()
+                        try {
+                            focusRequester.requestFocus()
+                        } catch (e: Exception) {
+                            // Ignored
+                        }
+                    },
                     enabled = uiState.inputMessage.isNotBlank() && !uiState.isSending,
                     modifier = Modifier
                         .size(44.dp)

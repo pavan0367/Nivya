@@ -36,4 +36,8 @@ public interface ConvocationMessageRepository extends JpaRepository<ConvocationM
             @Param("childUserId") Long childUserId,
             @Param("familyId") Long familyId,
             @Param("now") Instant now);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM ConvocationMessage m WHERE m.senderUserId = :userId OR m.receiverUserId = :userId")
+    void deleteAllByUserId(@Param("userId") Long userId);
 }

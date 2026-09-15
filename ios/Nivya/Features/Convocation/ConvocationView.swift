@@ -2,6 +2,7 @@ import SwiftUI
 
 public struct ConvocationView: View {
     @ObservedObject private var appState = AppState.shared
+    @FocusState private var isInputFocused: Bool
     @State private var messages: [ConvocationMessageResponse] = []
     @State private var remainingViewingSeconds: Int = 120
     @State private var isConvocationActive: Bool = true
@@ -71,6 +72,7 @@ public struct ConvocationView: View {
                 // Bottom Composer
                 HStack(spacing: 12) {
                     TextField("Type safety message...", text: $messageInput)
+                        .focused($isInputFocused)
                         .foregroundColor(.white)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
@@ -219,6 +221,7 @@ public struct ConvocationView: View {
 
         isSending = true
         messageInput = ""
+        isInputFocused = true
 
         Task {
             do {
@@ -228,17 +231,20 @@ public struct ConvocationView: View {
                     DispatchQueue.main.async {
                         self.messages.append(sent)
                         self.isSending = false
+                        self.isInputFocused = true
                     }
                 } else {
                     let sent = try await ConvocationRepository.shared.childSendMessage(message: text)
                     DispatchQueue.main.async {
                         self.messages.append(sent)
                         self.isSending = false
+                        self.isInputFocused = true
                     }
                 }
             } catch {
                 DispatchQueue.main.async {
                     self.isSending = false
+                    self.isInputFocused = true
                 }
             }
         }

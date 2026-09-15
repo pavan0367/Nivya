@@ -19,6 +19,7 @@ public class PairingRequest {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "requester_user_id", nullable = false)
+    @org.hibernate.annotations.OnDelete(action = org.hibernate.annotations.OnDeleteAction.CASCADE)
     private User requester;
 
     @Column(name = "connection_code", nullable = false, unique = true, length = 32)
@@ -43,6 +44,7 @@ public class PairingRequest {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "accepted_by_user_id")
+    @org.hibernate.annotations.OnDelete(action = org.hibernate.annotations.OnDeleteAction.CASCADE)
     private User acceptedBy;
 
     @Column(name = "created_at", nullable = false, updatable = false)

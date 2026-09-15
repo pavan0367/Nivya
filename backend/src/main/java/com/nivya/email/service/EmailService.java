@@ -66,6 +66,21 @@ public class EmailService {
     public void generateVerificationCode(String email, String purpose, User user) {
         String normalizedEmail = email.toLowerCase().trim();
 
+        // If user not provided (e.g. unauthenticated resend), associate existing account if registered
+        if (user == null) {
+            user = userRepository.findByEmail(normalizedEmail).orElse(null);
+        }
+
+        // Invalidate previous active unused codes for this email and purpose so they cannot be reused
+        List<EmailVerificationCode> existingCodes = verificationCodeRepository
+                .findAllByEmailAndPurposeAndUsedAtIsNull(normalizedEmail, purpose);
+        for (EmailVerificationCode oldCode : existingCodes) {
+            oldCode.markUsed();
+        }
+        if (!existingCodes.isEmpty()) {
+            verificationCodeRepository.saveAll(existingCodes);
+        }
+
         // 1. Generate secure 6-digit verification code
         int codeInt = 100000 + RANDOM.nextInt(900000);
         String plaintextCode = String.valueOf(codeInt);
@@ -81,18 +96,21 @@ public class EmailService {
                 "Verification code generated for " + normalizedEmail + " (" + purpose + ")", "SYSTEM");
 
         // 3. Dispatch email asynchronously (NEVER log the plaintext code)
-        String subject = "Your Nivya Verification Code";
-        String bodyText = "Hello,\n\nYour Nivya verification code is: " + plaintextCode +
-                "\n\nThis code expires in " + VERIFICATION_TTL_MINUTES + " minutes and can only be used once.\n" +
-                "If you did not request this code, please ignore this email.\n\nTogether for a Safer Tomorrow,\nTeam Nivya";
+        String subject = "Nivya - Email Verification";
+        String bodyText = "Nivya\nEmail Verification\n\nYour verification code:\n" + plaintextCode +
+                "\n\nThis code expires in " + VERIFICATION_TTL_MINUTES + " minutes.";
 
-        String bodyHtml = "<html><body style='font-family: Arial, sans-serif;'>" +
-                "<h2>Nivya Email Verification</h2>" +
-                "<p>Your single-use verification code is:</p>" +
-                "<h1 style='letter-spacing: 4px; color: #6366F1;'>" + plaintextCode + "</h1>" +
-                "<p>This code expires in <strong>" + VERIFICATION_TTL_MINUTES + " minutes</strong>.</p>" +
-                "<p style='color: #64748B;'>If you did not request this, you can safely disregard this message.</p>" +
-                "</body></html>";
+        String bodyHtml = "<!DOCTYPE html><html><head><meta charset='UTF-8'></head>" +
+                "<body style='font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background-color: #0F172A; color: #F8FAFC; padding: 32px 16px; margin: 0;'>" +
+                "<div style='max-width: 480px; margin: 0 auto; background: #1E293B; border-radius: 12px; border: 1px solid #334155; padding: 32px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);'>" +
+                "<div style='margin-bottom: 24px;'><h1 style='color: #6366F1; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 0.5px;'>Nivya</h1>" +
+                "<h2 style='color: #E2E8F0; margin: 8px 0 0 0; font-size: 18px; font-weight: 600;'>Email Verification</h2></div>" +
+                "<p style='color: #94A3B8; font-size: 14px; margin: 16px 0 8px 0;'>Your verification code:</p>" +
+                "<div style='background: #0F172A; border: 1px solid #4F46E5; border-radius: 8px; padding: 18px; text-align: center; margin: 16px 0;'>" +
+                "<span style='font-family: monospace; font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #818CF8; display: inline-block;'>" + plaintextCode + "</span>" +
+                "</div>" +
+                "<p style='color: #CBD5E1; font-size: 13px; margin: 16px 0 0 0;'>This code expires in " + VERIFICATION_TTL_MINUTES + " minutes.</p>" +
+                "</div></body></html>";
 
         String idempotencyKey = "verify-" + normalizedEmail + "-" + System.currentTimeMillis();
         dispatchEmailAsync(user, normalizedEmail, "VERIFICATION", subject, bodyHtml, bodyText, idempotencyKey);
@@ -284,6 +302,157 @@ public class EmailService {
             dispatchEmailSync(user, user.getEmail(), "SECURITY", subject, bodyHtml, bodyText, idempotencyKey);
         } catch (Exception e) {
             log.error("Failed to send security email: {}", e.getMessage());
+        }
+    }
+
+    // =========================================================================
+    // 3. ACCOUNT DELETION NOTIFICATIONS
+    // =========================================================================
+
+    @Async("taskExecutor")
+    public void sendParentAccountDeletionConfirmationAsync(String recipientEmail, String recipientName) {
+        try {
+            String timestampStr = formatTimestamp(Instant.now());
+            String subject = "Nivya Account Permanently Deleted";
+            String bodyText = String.format(
+                    "Hello %s,\n\n" +
+                    "Your Nivya parent administrator account (%s) has been permanently deleted.\n\n" +
+                    "This action is complete and irreversible. All your personal credentials, session tokens, device registrations, and security settings have been permanently removed from our servers.\n\n" +
+                    "Date/Time of Deletion: %s\n\n" +
+                    "If you did not authorize this action, please contact Nivya Support immediately.\n\n" +
+                    "Nivya Security Team",
+                    recipientName != null && !recipientName.isBlank() ? recipientName : "Parent",
+                    recipientEmail,
+                    timestampStr
+            );
+
+            String bodyHtml = String.format(
+                    "<!DOCTYPE html><html><head><meta charset='UTF-8'></head>" +
+                    "<body style='font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background-color: #0F172A; color: #F8FAFC; padding: 32px 16px; margin: 0;'>" +
+                    "<div style='max-width: 480px; margin: 0 auto; background: #1E293B; border-radius: 12px; border: 1px solid #334155; padding: 32px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);'>" +
+                    "<div style='margin-bottom: 20px;'><h1 style='color: #EF4444; margin: 0; font-size: 22px; font-weight: 800;'>Nivya</h1>" +
+                    "<h2 style='color: #E2E8F0; margin: 6px 0 0 0; font-size: 17px; font-weight: 600;'>Account Permanently Deleted</h2></div>" +
+                    "<p style='color: #94A3B8; font-size: 14px; line-height: 1.5; margin: 16px 0;'>" +
+                    "Hello <strong style='color: #F8FAFC;'>%s</strong>," +
+                    "</p>" +
+                    "<p style='color: #94A3B8; font-size: 14px; line-height: 1.5; margin: 16px 0;'>" +
+                    "Your Nivya parent account (<strong style='color: #F8FAFC;'>%s</strong>) has been permanently deleted. This action is complete and irreversible." +
+                    "</p>" +
+                    "<div style='background: #0F172A; border-left: 3px solid #EF4444; border-radius: 6px; padding: 14px 16px; margin: 16px 0;'>" +
+                    "<p style='color: #CBD5E1; font-size: 13px; margin: 0;'>All personal credentials, device sessions, and configuration settings have been permanently removed from our servers.</p>" +
+                    "</div>" +
+                    "<p style='color: #64748B; font-size: 12px; margin: 16px 0 0 0;'>Date/Time of Deletion: %s</p>" +
+                    "<p style='color: #64748B; font-size: 12px; margin: 8px 0 0 0;'>If you did not authorize this action, please contact Nivya Support immediately.</p>" +
+                    "</div></body></html>",
+                    recipientName != null && !recipientName.isBlank() ? recipientName : "Parent",
+                    recipientEmail,
+                    timestampStr
+            );
+
+            String idempotencyKey = "parent-del-conf-" + recipientEmail + "-" + System.currentTimeMillis();
+            dispatchEmailSync(null, recipientEmail, "ACCOUNT_DELETED", subject, bodyHtml, bodyText, idempotencyKey);
+        } catch (Exception e) {
+            log.error("Failed to send parent account deletion confirmation to {}: {}", recipientEmail, e.getMessage());
+        }
+    }
+
+    @Async("taskExecutor")
+    public void sendChildAccountDeletionConfirmationAsync(String recipientEmail, String recipientName) {
+        try {
+            String timestampStr = formatTimestamp(Instant.now());
+            String subject = "Your Nivya Account Permanently Deleted";
+            String bodyText = String.format(
+                    "Hello %s,\n\n" +
+                    "Your Nivya account (%s) has been permanently deleted.\n\n" +
+                    "This action is complete and irreversible. All your personal data, credentials, and active device sessions have been permanently removed from our servers.\n\n" +
+                    "Date/Time of Deletion: %s\n\n" +
+                    "Nivya Safety Team",
+                    recipientName != null && !recipientName.isBlank() ? recipientName : "User",
+                    recipientEmail,
+                    timestampStr
+            );
+
+            String bodyHtml = String.format(
+                    "<!DOCTYPE html><html><head><meta charset='UTF-8'></head>" +
+                    "<body style='font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background-color: #0F172A; color: #F8FAFC; padding: 32px 16px; margin: 0;'>" +
+                    "<div style='max-width: 480px; margin: 0 auto; background: #1E293B; border-radius: 12px; border: 1px solid #334155; padding: 32px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);'>" +
+                    "<div style='margin-bottom: 20px;'><h1 style='color: #EF4444; margin: 0; font-size: 22px; font-weight: 800;'>Nivya</h1>" +
+                    "<h2 style='color: #E2E8F0; margin: 6px 0 0 0; font-size: 17px; font-weight: 600;'>Your Nivya Account Has Been Deleted</h2></div>" +
+                    "<p style='color: #94A3B8; font-size: 14px; line-height: 1.5; margin: 16px 0;'>" +
+                    "Hello <strong style='color: #F8FAFC;'>%s</strong>," +
+                    "</p>" +
+                    "<p style='color: #94A3B8; font-size: 14px; line-height: 1.5; margin: 16px 0;'>" +
+                    "Your Nivya account (<strong style='color: #F8FAFC;'>%s</strong>) has been permanently deleted. This action is complete and irreversible." +
+                    "</p>" +
+                    "<div style='background: #0F172A; border-left: 3px solid #EF4444; border-radius: 6px; padding: 14px 16px; margin: 16px 0;'>" +
+                    "<p style='color: #CBD5E1; font-size: 13px; margin: 0;'>All your personal data, credentials, and active device sessions have been permanently removed.</p>" +
+                    "</div>" +
+                    "<p style='color: #64748B; font-size: 12px; margin: 16px 0 0 0;'>Date/Time of Deletion: %s</p>" +
+                    "</div></body></html>",
+                    recipientName != null && !recipientName.isBlank() ? recipientName : "User",
+                    recipientEmail,
+                    timestampStr
+            );
+
+            String idempotencyKey = "child-del-conf-" + recipientEmail + "-" + System.currentTimeMillis();
+            dispatchEmailSync(null, recipientEmail, "ACCOUNT_DELETED", subject, bodyHtml, bodyText, idempotencyKey);
+        } catch (Exception e) {
+            log.error("Failed to send child account deletion confirmation to {}: {}", recipientEmail, e.getMessage());
+        }
+    }
+
+    @Async("taskExecutor")
+    public void sendParentNotificationOfChildDeletionAsync(String parentEmail, String parentName, String childName, String childEmail) {
+        try {
+            String timestampStr = formatTimestamp(Instant.now());
+            String subject = "Your Child's Nivya Account Has Been Deleted";
+            String bodyText = String.format(
+                    "Hello %s,\n\n" +
+                    "Your child's Nivya account has been permanently deleted.\n\n" +
+                    "Account Details:\n" +
+                    "Child Name: %s\n" +
+                    "Child Email: %s\n" +
+                    "Date/Time of Deletion: %s\n\n" +
+                    "This action is complete and irreversible. Your child's account, devices, and profile credentials have been removed from your family unit.\n\n" +
+                    "Your parent administrator account and other family members remain active and unaffected.\n\n" +
+                    "Nivya Safety Team",
+                    parentName != null && !parentName.isBlank() ? parentName : "Parent",
+                    childName != null && !childName.isBlank() ? childName : "Child",
+                    childEmail,
+                    timestampStr
+            );
+
+            String bodyHtml = String.format(
+                    "<!DOCTYPE html><html><head><meta charset='UTF-8'></head>" +
+                    "<body style='font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background-color: #0F172A; color: #F8FAFC; padding: 32px 16px; margin: 0;'>" +
+                    "<div style='max-width: 480px; margin: 0 auto; background: #1E293B; border-radius: 12px; border: 1px solid #334155; padding: 32px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);'>" +
+                    "<div style='margin-bottom: 20px;'><h1 style='color: #EF4444; margin: 0; font-size: 22px; font-weight: 800;'>Nivya</h1>" +
+                    "<h2 style='color: #E2E8F0; margin: 6px 0 0 0; font-size: 17px; font-weight: 600;'>Child Account Deletion Notice</h2></div>" +
+                    "<p style='color: #94A3B8; font-size: 14px; line-height: 1.5; margin: 16px 0;'>" +
+                    "Hello <strong style='color: #F8FAFC;'>%s</strong>," +
+                    "</p>" +
+                    "<p style='color: #F8FAFC; font-size: 15px; font-weight: 600; line-height: 1.5; margin: 16px 0;'>" +
+                    "Your child's Nivya account has been permanently deleted." +
+                    "</p>" +
+                    "<div style='background: #0F172A; border-left: 3px solid #EF4444; border-radius: 6px; padding: 14px 16px; margin: 16px 0;'>" +
+                    "<p style='color: #CBD5E1; font-size: 13px; margin: 0 0 6px 0;'><strong>Child Name:</strong> %s</p>" +
+                    "<p style='color: #CBD5E1; font-size: 13px; margin: 0 0 6px 0;'><strong>Child Email:</strong> %s</p>" +
+                    "<p style='color: #CBD5E1; font-size: 13px; margin: 0;'><strong>Deletion Time:</strong> %s</p>" +
+                    "</div>" +
+                    "<p style='color: #94A3B8; font-size: 13px; line-height: 1.5; margin: 16px 0;'>" +
+                    "This action is complete and irreversible. Your parent administrator account and other family members remain intact and unaffected." +
+                    "</p>" +
+                    "</div></body></html>",
+                    parentName != null && !parentName.isBlank() ? parentName : "Parent",
+                    childName != null && !childName.isBlank() ? childName : "Child",
+                    childEmail,
+                    timestampStr
+            );
+
+            String idempotencyKey = "parent-notify-child-del-" + childEmail + "-" + System.currentTimeMillis();
+            dispatchEmailSync(null, parentEmail, "CHILD_ACCOUNT_DELETED_NOTICE", subject, bodyHtml, bodyText, idempotencyKey);
+        } catch (Exception e) {
+            log.error("Failed to send child deletion notice to parent {}: {}", parentEmail, e.getMessage());
         }
     }
 

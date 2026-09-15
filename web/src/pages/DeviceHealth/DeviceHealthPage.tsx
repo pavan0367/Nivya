@@ -48,33 +48,13 @@ export const DeviceHealthPage: React.FC = () => {
       if (hRes.status === 'fulfilled' && hRes.value) {
         setHealth(hRes.value);
       } else {
-        // Fallback demo data
-        setHealth({
-          deviceId: activeDeviceId,
-          totalStorageBytes: 64 * 1024 * 1024 * 1024,
-          freeStorageBytes: 24.5 * 1024 * 1024 * 1024,
-          isLowStorage: false,
-          isHealthy: true,
-          permissions: {
-            location: true,
-            usage: true,
-            notification: true,
-          },
-          recordedAt: new Date().toISOString(),
-        });
+        setHealth(null);
       }
 
       if (bRes.status === 'fulfilled' && bRes.value) {
         setBattery(bRes.value);
       } else {
-        setBattery({
-          batteryPct: 78,
-          isCharging: false,
-          powerSaveMode: false,
-          healthStatus: 'GOOD',
-          temperatureCelsius: 31,
-          recordedAt: new Date().toISOString(),
-        });
+        setBattery(null);
       }
     } catch (err: any) {
       console.error('Failed to load device health:', err);
@@ -98,10 +78,10 @@ export const DeviceHealthPage: React.FC = () => {
   }
 
   // Storage calculations
-  const totalGB = health ? (health.totalStorageBytes / (1024 * 1024 * 1024)).toFixed(1) : '64.0';
-  const freeGB = health ? (health.freeStorageBytes / (1024 * 1024 * 1024)).toFixed(1) : '24.5';
-  const usedGB = (parseFloat(totalGB) - parseFloat(freeGB)).toFixed(1);
-  const usedPct = Math.round((parseFloat(usedGB) / parseFloat(totalGB)) * 100) || 50;
+  const totalGB = health && health.totalStorageBytes > 0 ? (health.totalStorageBytes / (1024 * 1024 * 1024)).toFixed(1) : null;
+  const freeGB = health && health.freeStorageBytes > 0 ? (health.freeStorageBytes / (1024 * 1024 * 1024)).toFixed(1) : null;
+  const usedGB = (totalGB !== null && freeGB !== null) ? (parseFloat(totalGB) - parseFloat(freeGB)).toFixed(1) : null;
+  const usedPct = (totalGB !== null && usedGB !== null) ? Math.round((parseFloat(usedGB) / parseFloat(totalGB)) * 100) : null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -134,36 +114,45 @@ export const DeviceHealthPage: React.FC = () => {
         <MetricCard
           id="metric-health-status"
           title="Overall Status"
-          value={health?.isHealthy ? 'Optimal' : 'Attention Needed'}
-          subtitle={health?.isHealthy ? 'All sensors & permissions intact' : 'Action recommended'}
+          value={health ? (health.isHealthy ? 'Optimal' : 'Attention Needed') : 'Unavailable'}
+          subtitle={health ? (health.isHealthy ? 'All sensors & permissions intact' : 'Action recommended') : 'Waiting for device data'}
           icon={<HeartPulse size={24} />}
-          badge={{
-            text: health?.isHealthy ? 'HEALTHY' : 'WARNING',
-            variant: health?.isHealthy ? 'success' : 'danger',
+          badge={health ? {
+            text: health.isHealthy ? 'HEALTHY' : 'WARNING',
+            variant: health.isHealthy ? 'success' : 'danger',
+          } : {
+            text: 'NO DATA',
+            variant: 'neutral',
           }}
         />
 
         <MetricCard
           id="metric-storage-available"
           title="Available Storage"
-          value={`${freeGB} GB Free`}
-          subtitle={`Total capacity: ${totalGB} GB`}
+          value={freeGB !== null ? `${freeGB} GB Free` : 'Unavailable'}
+          subtitle={totalGB !== null ? `Total capacity: ${totalGB} GB` : 'Waiting for storage metrics'}
           icon={<HardDrive size={24} />}
-          badge={{
-            text: health?.isLowStorage ? 'LOW STORAGE' : 'SUFFICIENT',
-            variant: health?.isLowStorage ? 'danger' : 'success',
+          badge={health ? {
+            text: health.isLowStorage ? 'LOW STORAGE' : 'SUFFICIENT',
+            variant: health.isLowStorage ? 'danger' : 'success',
+          } : {
+            text: 'NO DATA',
+            variant: 'neutral',
           }}
         />
 
         <MetricCard
           id="metric-battery-condition"
           title="Battery Condition"
-          value={battery?.healthStatus || 'GOOD'}
-          subtitle={`Current charge: ${battery?.batteryPct || 78}% ${battery?.temperatureCelsius ? `(${battery.temperatureCelsius}°C)` : ''}`}
+          value={battery ? (battery.healthStatus || 'GOOD') : 'Unavailable'}
+          subtitle={battery ? `Current charge: ${battery.batteryPct}% ${battery.temperatureCelsius ? `(${battery.temperatureCelsius}°C)` : ''}` : 'Waiting for battery metrics'}
           icon={<Battery size={24} />}
-          badge={{
-            text: battery?.healthStatus === 'GOOD' ? 'OPTIMAL' : 'DEGRADED',
-            variant: battery?.healthStatus === 'GOOD' ? 'success' : 'warning',
+          badge={battery ? {
+            text: battery.healthStatus === 'GOOD' ? 'OPTIMAL' : 'DEGRADED',
+            variant: battery.healthStatus === 'GOOD' ? 'success' : 'warning',
+          } : {
+            text: 'NO DATA',
+            variant: 'neutral',
           }}
         />
       </div>
@@ -174,42 +163,48 @@ export const DeviceHealthPage: React.FC = () => {
         title="Storage Utilization Gauge"
         subtitle="Internal flash storage allocation"
       >
-        <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.95rem' }}>
-            <span style={{ color: 'var(--text-muted)' }}>
-              Used: <strong style={{ color: '#fff' }}>{usedGB} GB</strong> of {totalGB} GB
-            </span>
-            <span style={{ fontWeight: 700, color: usedPct > 90 ? 'var(--danger)' : 'var(--primary)' }}>
-              {usedPct}% full
-            </span>
-          </div>
+        {usedPct !== null && totalGB !== null && freeGB !== null && usedGB !== null ? (
+          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.95rem' }}>
+              <span style={{ color: 'var(--text-muted)' }}>
+                Used: <strong style={{ color: '#fff' }}>{usedGB} GB</strong> of {totalGB} GB
+              </span>
+              <span style={{ fontWeight: 700, color: usedPct > 90 ? 'var(--danger)' : 'var(--primary)' }}>
+                {usedPct}% full
+              </span>
+            </div>
 
-          <div
-            style={{
-              width: '100%',
-              height: '12px',
-              background: 'rgba(255, 255, 255, 0.08)',
-              borderRadius: '6px',
-              overflow: 'hidden',
-            }}
-          >
             <div
               style={{
-                width: `${usedPct}%`,
-                height: '100%',
-                background: usedPct > 90 ? 'var(--danger)' : 'var(--primary-gradient)',
+                width: '100%',
+                height: '12px',
+                background: 'rgba(255, 255, 255, 0.08)',
                 borderRadius: '6px',
-                transition: 'width 0.4s ease',
+                overflow: 'hidden',
               }}
-            />
-          </div>
+            >
+              <div
+                style={{
+                  width: `${usedPct}%`,
+                  height: '100%',
+                  background: usedPct > 90 ? 'var(--danger)' : 'var(--primary-gradient)',
+                  borderRadius: '6px',
+                  transition: 'width 0.4s ease',
+                }}
+              />
+            </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-dim)' }}>
-            <span>0 GB</span>
-            <span>{freeGB} GB Remaining</span>
-            <span>{totalGB} GB</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-dim)' }}>
+              <span>0 GB</span>
+              <span>{freeGB} GB Remaining</span>
+              <span>{totalGB} GB</span>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.875rem' }}>
+            Waiting for device storage telemetry...
+          </div>
+        )}
       </ContentCard>
 
       {/* Permissions Audit Checklist */}
@@ -218,97 +213,103 @@ export const DeviceHealthPage: React.FC = () => {
         title="Privacy & Telemetry Permission Health"
         subtitle="Verification that Android permissions required for legitimate supervision remain granted"
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginTop: '0.5rem' }}>
-          {/* Location Permission */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '1rem 1.25rem',
-              borderRadius: 'var(--radius-md)',
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid var(--border-subtle)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-              {health?.permissions.location ? (
-                <CheckCircle size={22} color="var(--success)" />
-              ) : (
-                <XCircle size={22} color="var(--danger)" />
-              )}
-              <div>
-                <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.95rem' }}>Location Services (GPS)</div>
-                <div style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>
-                  Permits family safe zone checks and breadcrumb updates
+        {health?.permissions ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginTop: '0.5rem' }}>
+            {/* Location Permission */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '1rem 1.25rem',
+                borderRadius: 'var(--radius-md)',
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid var(--border-subtle)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                {health.permissions.location ? (
+                  <CheckCircle size={22} color="var(--success)" />
+                ) : (
+                  <XCircle size={22} color="var(--danger)" />
+                )}
+                <div>
+                  <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.95rem' }}>Location Services (GPS)</div>
+                  <div style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>
+                    Permits family safe zone checks and breadcrumb updates
+                  </div>
                 </div>
               </div>
+              <span className={`badge ${health.permissions.location ? 'badge-success' : 'badge-danger'}`}>
+                {health.permissions.location ? 'Granted' : 'Revoked / Missing'}
+              </span>
             </div>
-            <span className={`badge ${health?.permissions.location ? 'badge-success' : 'badge-danger'}`}>
-              {health?.permissions.location ? 'Granted' : 'Revoked / Missing'}
-            </span>
-          </div>
 
-          {/* Usage Access Permission */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '1rem 1.25rem',
-              borderRadius: 'var(--radius-md)',
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid var(--border-subtle)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-              {health?.permissions.usage ? (
-                <CheckCircle size={22} color="var(--success)" />
-              ) : (
-                <XCircle size={22} color="var(--danger)" />
-              )}
-              <div>
-                <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.95rem' }}>App Usage Stats Access</div>
-                <div style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>
-                  Enables screen time aggregation and foreground activity auditing
+            {/* Usage Access Permission */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '1rem 1.25rem',
+                borderRadius: 'var(--radius-md)',
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid var(--border-subtle)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                {health.permissions.usage ? (
+                  <CheckCircle size={22} color="var(--success)" />
+                ) : (
+                  <XCircle size={22} color="var(--danger)" />
+                )}
+                <div>
+                  <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.95rem' }}>App Usage Stats Access</div>
+                  <div style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>
+                    Enables screen time aggregation and foreground activity auditing
+                  </div>
                 </div>
               </div>
+              <span className={`badge ${health.permissions.usage ? 'badge-success' : 'badge-danger'}`}>
+                {health.permissions.usage ? 'Granted' : 'Revoked / Missing'}
+              </span>
             </div>
-            <span className={`badge ${health?.permissions.usage ? 'badge-success' : 'badge-danger'}`}>
-              {health?.permissions.usage ? 'Granted' : 'Revoked / Missing'}
-            </span>
-          </div>
 
-          {/* Notification Permission */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '1rem 1.25rem',
-              borderRadius: 'var(--radius-md)',
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid var(--border-subtle)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-              {health?.permissions.notification ? (
-                <CheckCircle size={22} color="var(--success)" />
-              ) : (
-                <XCircle size={22} color="var(--danger)" />
-              )}
-              <div>
-                <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.95rem' }}>Push Notification Delivery</div>
-                <div style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>
-                  Permits delivery of family alerts and Convocation wakeups
+            {/* Notification Permission */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '1rem 1.25rem',
+                borderRadius: 'var(--radius-md)',
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid var(--border-subtle)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                {health.permissions.notification ? (
+                  <CheckCircle size={22} color="var(--success)" />
+                ) : (
+                  <XCircle size={22} color="var(--danger)" />
+                )}
+                <div>
+                  <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.95rem' }}>Push Notification Delivery</div>
+                  <div style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>
+                    Permits delivery of family alerts and Convocation wakeups
+                  </div>
                 </div>
               </div>
+              <span className={`badge ${health.permissions.notification ? 'badge-success' : 'badge-danger'}`}>
+                {health.permissions.notification ? 'Granted' : 'Disabled'}
+              </span>
             </div>
-            <span className={`badge ${health?.permissions.notification ? 'badge-success' : 'badge-danger'}`}>
-              {health?.permissions.notification ? 'Granted' : 'Disabled'}
-            </span>
           </div>
-        </div>
+        ) : (
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.875rem' }}>
+            Waiting for device permission diagnostics...
+          </div>
+        )}
       </ContentCard>
     </div>
   );

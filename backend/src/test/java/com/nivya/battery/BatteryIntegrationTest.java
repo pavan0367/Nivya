@@ -290,6 +290,29 @@ class BatteryIntegrationTest {
                 .andExpect(jsonPath("$.data.drainRatePctPerHour").value(8.0));
     }
 
+    @Test
+    @DisplayName("Query current battery when no telemetry exists returns 200 with null data (not 404)")
+    void testCurrentBatteryWhenNoTelemetryRecordedReturns200WithNullData() throws Exception {
+        // Enroll a brand-new device without telemetry
+        Device freshDevice = new Device(childUser, family, "device-fresh-uuid", "Fresh Device", "ANDROID");
+        deviceRepository.save(freshDevice);
+
+        mockMvc.perform(get("/api/v1/battery/current/" + freshDevice.getId())
+                        .header("Authorization", "Bearer " + parentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").doesNotExist())
+                .andExpect(jsonPath("$.message").value("No battery telemetry recorded yet"));
+    }
+
+    @Test
+    @DisplayName("Query current battery for non-existent device ID returns 404")
+    void testCurrentBatteryDeviceNotFoundReturns404() throws Exception {
+        mockMvc.perform(get("/api/v1/battery/current/999999")
+                        .header("Authorization", "Bearer " + parentToken))
+                .andExpect(status().isNotFound());
+    }
+
     private String extractToken(MvcResult result) throws Exception {
         JsonNode root = objectMapper.readTree(result.getResponse().getContentAsString());
         return root.path("data").path("accessToken").asText();

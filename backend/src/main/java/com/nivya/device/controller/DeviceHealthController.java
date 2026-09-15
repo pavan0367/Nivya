@@ -42,7 +42,7 @@ public class DeviceHealthController {
             @PathVariable Long deviceId) {
 
         DeviceHealthResponse response = deviceHealthService.getDeviceHealth(deviceId, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Device health retrieved"));
+        return ResponseEntity.ok(ApiResponse.success(response, response != null ? "Device health retrieved" : "No device health telemetry recorded yet"));
     }
 
     @GetMapping("/my")

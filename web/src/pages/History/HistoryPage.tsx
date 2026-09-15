@@ -79,57 +79,7 @@ export const HistoryPage: React.FC = () => {
       setTotalPages(res.totalPages || 1);
     } catch (err: any) {
       console.error('Failed to load history:', err);
-      // Fallback demo data if backend is empty
-      setEvents([
-        {
-          id: 1,
-          deviceId: activeDeviceId,
-          packageName: 'com.whatsapp',
-          appName: 'WhatsApp',
-          broadActivity: 'Chatting with Arun',
-          activityLabel: 'Contact: Arun',
-          category: 'Communication',
-          durationSeconds: 320,
-          durationFormatted: '5m',
-          eventTimestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-        },
-        {
-          id: 2,
-          deviceId: activeDeviceId,
-          packageName: 'com.google.android.apps.nbu.files',
-          appName: 'Files',
-          broadActivity: 'Viewing report.pdf',
-          activityLabel: 'Document: report.pdf',
-          category: 'Productivity',
-          durationSeconds: 540,
-          durationFormatted: '9m',
-          eventTimestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-        },
-        {
-          id: 3,
-          deviceId: activeDeviceId,
-          packageName: 'com.android.chrome',
-          appName: 'Chrome',
-          broadActivity: 'Browsing educational material',
-          activityLabel: 'Domain: khanacademy.org',
-          category: 'Education',
-          durationSeconds: 1800,
-          durationFormatted: '30m',
-          eventTimestamp: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
-        },
-        {
-          id: 4,
-          deviceId: activeDeviceId,
-          packageName: 'com.google.android.youtube',
-          appName: 'YouTube',
-          broadActivity: 'Watching math tutorial',
-          activityLabel: 'Channel: Numberphile',
-          category: 'Entertainment',
-          durationSeconds: 1200,
-          durationFormatted: '20m',
-          eventTimestamp: new Date(Date.now() - 150 * 60 * 1000).toISOString(),
-        },
-      ]);
+      setEvents([]);
       setTotalPages(1);
     } finally {
       setLoading(false);

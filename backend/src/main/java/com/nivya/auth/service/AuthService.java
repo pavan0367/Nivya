@@ -42,6 +42,7 @@ public class AuthService {
     private final DeviceSessionService deviceSessionService;
     private final EmailService emailService;
     private final long refreshTokenExpirationMs;
+    private final boolean emailVerificationRequired;
 
     public AuthService(
             UserRepository userRepository,
@@ -52,7 +53,8 @@ public class AuthService {
             AuditService auditService,
             DeviceSessionService deviceSessionService,
             EmailService emailService,
-            @Value("${nivya.jwt.refresh-token-expiration-ms:604800000}") long refreshTokenExpirationMs) {
+            @Value("${nivya.jwt.refresh-token-expiration-ms:604800000}") long refreshTokenExpirationMs,
+            @Value("${nivya.email.verification-required:false}") boolean emailVerificationRequired) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
@@ -62,6 +64,7 @@ public class AuthService {
         this.deviceSessionService = deviceSessionService;
         this.emailService = emailService;
         this.refreshTokenExpirationMs = refreshTokenExpirationMs;
+        this.emailVerificationRequired = emailVerificationRequired;
     }
 
     @Transactional
@@ -81,10 +84,14 @@ public class AuthService {
         String passwordHash = passwordEncoder.encode(request.getPassword());
         User user = new User(request.getName(), normalizedEmail, passwordHash, request.getRole());
         user.setPhone(request.getPhone());
-        user.setStatus(UserStatus.PENDING); // Verification required before full activation
+        
+        // When email verification is disabled for development/testing, activate account immediately
+        UserStatus initialStatus = emailVerificationRequired ? UserStatus.PENDING : UserStatus.ACTIVE;
+        user.setStatus(initialStatus);
         user = userRepository.save(user);
 
-        log.info("Registered new user with ID: {}, role: {}, status: PENDING", user.getId(), user.getRole());
+        log.info("Registered new user with ID: {}, role: {}, status: {} (verificationRequired={})",
+                user.getId(), user.getRole(), initialStatus, emailVerificationRequired);
         auditService.logEvent(user.getId(), "AUTH_REGISTER_SUCCESS", "Registered new user with role " + user.getRole(), ipAddress);
 
         // Asynchronously generate and dispatch verification code via configured EmailProvider
@@ -128,9 +135,16 @@ public class AuthService {
             throw new BadCredentialsException("Invalid email or password");
         }
 
-        if (user.getStatus() == UserStatus.PENDING) {
+        if (emailVerificationRequired && user.getStatus() == UserStatus.PENDING) {
             auditService.logEvent(user.getId(), "AUTH_LOGIN_BLOCKED", "Unverified account login attempt: " + normalizedEmail, ipAddress);
             throw new BadCredentialsException("Account email is not verified. Please verify your email before logging in.");
+        }
+
+        if (!emailVerificationRequired && user.getStatus() == UserStatus.PENDING) {
+            // Auto-activate pending accounts in development/testing mode
+            user.setStatus(UserStatus.ACTIVE);
+            userRepository.save(user);
+            log.info("Auto-activated pending user {} due to EMAIL_VERIFICATION_REQUIRED=false", user.getEmail());
         }
 
         if (user.getStatus() != UserStatus.ACTIVE) {

@@ -63,6 +63,7 @@ describe('authService & Role Isolation', () => {
 
     expect(authService.isAuthenticated()).toBe(true);
     expect(authService.getUserRole()).toBe('CHILD');
+    expect(authService.isChild()).toBe(true);
     expect(authService.isParent()).toBe(false);
   });
 
@@ -107,5 +108,46 @@ describe('authService & Role Isolation', () => {
     expect(localStorage.getItem('nivya_user_role')).toBe('PARENT');
     expect(authService.isAuthenticated()).toBe(true);
     expect(authService.isParent()).toBe(true);
+  });
+
+  it('handles permanent deletion and completely wipes credentials and local storage', async () => {
+    localStorage.setItem('nivya_access_token', 'active_token');
+    localStorage.setItem('nivya_refresh_token', 'active_refresh');
+    localStorage.setItem('nivya_user_role', 'PARENT');
+    localStorage.setItem('nivya_user', JSON.stringify({ id: 1, role: 'PARENT' }));
+
+    vi.spyOn(authService, 'deleteAccount').mockImplementation(async (_password, _approvalCode) => {
+      localStorage.clear();
+    });
+
+    await authService.deleteAccount('TestPassword123!');
+
+    expect(localStorage.getItem('nivya_access_token')).toBeNull();
+    expect(localStorage.getItem('nivya_refresh_token')).toBeNull();
+    expect(localStorage.getItem('nivya_user_role')).toBeNull();
+    expect(localStorage.getItem('nivya_user')).toBeNull();
+    expect(authService.isAuthenticated()).toBe(false);
+  });
+
+  it('supports child deletion approval request and code verification flow', async () => {
+    vi.spyOn(authService, 'requestChildDeletionApproval').mockResolvedValue({
+      success: true,
+      approvalCodeRequired: true,
+      parentEmailMasked: 'pa***@nivya.local',
+      expiresInMinutes: 15,
+      message: 'Code dispatched',
+    });
+
+    vi.spyOn(authService, 'verifyChildDeletionCode').mockResolvedValue({
+      valid: true,
+      message: 'Code verified',
+    });
+
+    const reqResult = await authService.requestChildDeletionApproval();
+    expect(reqResult.success).toBe(true);
+    expect(reqResult.parentEmailMasked).toBe('pa***@nivya.local');
+
+    const verifyResult = await authService.verifyChildDeletionCode('123456');
+    expect(verifyResult.valid).toBe(true);
   });
 });

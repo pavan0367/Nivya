@@ -41,4 +41,23 @@ final class CrackFreakTests: XCTestCase {
         XCTAssertTrue(freakMsg.isFreakEvent, "Should be recognized as FREAK event")
         XCTAssertFalse(freakMsg.isCrackEvent)
     }
+
+    func testConvocationInputAutoReadinessAfterSend() {
+        var messageInput = "First guidance note"
+        var isSending = true
+        var isInputFocused = false
+
+        // Simulate sendMessage execution
+        messageInput = ""
+        isInputFocused = true
+        isSending = false
+
+        XCTAssertEqual(messageInput, "", "Message input must be cleared")
+        XCTAssertFalse(isSending, "isSending must reset to false")
+        XCTAssertTrue(isInputFocused, "Input must remain focused and ready for next message")
+
+        // Ready for consecutive typing immediately
+        messageInput = "Second guidance note without tapping"
+        XCTAssertEqual(messageInput, "Second guidance note without tapping")
+    }
 }

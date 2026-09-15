@@ -50,52 +50,7 @@ export const UsagePage: React.FC = () => {
       if (data) {
         setUsage(data);
       } else {
-        // Fallback demo data
-        setUsage({
-          deviceId: activeDeviceId,
-          date: dateParam || now.toISOString().split('T')[0],
-          totalScreenTimeMinutes: 245,
-          categories: {
-            Education: 90,
-            Entertainment: 75,
-            Communication: 50,
-            Utilities: 30,
-          },
-          appUsages: [
-            {
-              id: 1,
-              packageName: 'org.khanacademy.android',
-              appName: 'Khan Academy',
-              category: 'Education',
-              durationMinutes: 90,
-              openCount: 4,
-            },
-            {
-              id: 2,
-              packageName: 'com.google.android.apps.youtube.kids',
-              appName: 'YouTube Kids',
-              category: 'Entertainment',
-              durationMinutes: 75,
-              openCount: 6,
-            },
-            {
-              id: 3,
-              packageName: 'com.whatsapp',
-              appName: 'WhatsApp',
-              category: 'Communication',
-              durationMinutes: 50,
-              openCount: 12,
-            },
-            {
-              id: 4,
-              packageName: 'com.google.android.apps.nbu.files',
-              appName: 'Files by Google',
-              category: 'Utilities',
-              durationMinutes: 30,
-              openCount: 5,
-            },
-          ],
-        });
+        setUsage(null);
       }
     } catch (err: any) {
       console.error('Failed to load screen time usage:', err);
@@ -121,12 +76,12 @@ export const UsagePage: React.FC = () => {
   const totalMinutes = usage?.totalScreenTimeMinutes || 0;
   const hours = Math.floor(totalMinutes / 60);
   const mins = totalMinutes % 60;
-  const screenTimeText = `${hours}h ${mins}m`;
+  const screenTimeText = usage ? `${hours}h ${mins}m` : 'Unavailable';
 
   const appUsages = usage?.appUsages || [];
 
   // Chart data for categories
-  const categoryChartData = usage?.categories
+  const categoryChartData = usage?.categories && Object.keys(usage.categories).length > 0
     ? Object.entries(usage.categories).map(([cat, m]) => ({
         label: cat,
         value: m,
@@ -233,16 +188,16 @@ export const UsagePage: React.FC = () => {
           id="metric-total-screentime"
           title="Total Screen Time"
           value={screenTimeText}
-          subtitle={`Aggregated for ${usage?.date || 'today'}`}
+          subtitle={usage ? `Aggregated for ${usage.date || 'today'}` : 'Waiting for device data'}
           icon={<Clock size={24} />}
-          badge={{ text: totalMinutes > 300 ? 'HIGH USAGE' : 'BALANCED', variant: totalMinutes > 300 ? 'warning' : 'success' }}
+          badge={usage ? { text: totalMinutes > 300 ? 'HIGH USAGE' : 'BALANCED', variant: totalMinutes > 300 ? 'warning' : 'success' } : { text: 'NO DATA', variant: 'neutral' }}
         />
 
         <MetricCard
           id="metric-top-category"
           title="Top Category"
-          value={categoryChartData.length > 0 ? categoryChartData[0].label : 'None'}
-          subtitle={categoryChartData.length > 0 ? `${categoryChartData[0].value} minutes recorded` : 'No data'}
+          value={categoryChartData.length > 0 ? categoryChartData[0].label : (usage ? 'None' : 'Unavailable')}
+          subtitle={categoryChartData.length > 0 ? `${categoryChartData[0].value} minutes recorded` : (usage ? 'No category recorded' : 'Waiting for device data')}
           icon={<PieChart size={24} />}
           badge={{ text: 'PRIMARY', variant: 'neutral' }}
         />
@@ -250,8 +205,8 @@ export const UsagePage: React.FC = () => {
         <MetricCard
           id="metric-active-apps"
           title="Active Apps Used"
-          value={appUsages.length}
-          subtitle="Foreground applications launched"
+          value={usage ? appUsages.length : 'Unavailable'}
+          subtitle={usage ? 'Foreground applications launched' : 'Waiting for device data'}
           icon={<Smartphone size={24} />}
         />
       </div>
@@ -263,13 +218,19 @@ export const UsagePage: React.FC = () => {
         subtitle="Minutes spent in each application category"
       >
         <div style={{ marginTop: '0.5rem' }}>
-          <BarChart
-            id="chart-usage-categories"
-            data={categoryChartData}
-            height={200}
-            color="var(--accent)"
-            unit="m"
-          />
+          {categoryChartData.length > 0 ? (
+            <BarChart
+              id="chart-usage-categories"
+              data={categoryChartData}
+              height={200}
+              color="var(--accent)"
+              unit="m"
+            />
+          ) : (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.875rem' }}>
+              No category usage stats reported for the selected date.
+            </div>
+          )}
         </div>
       </ContentCard>
 

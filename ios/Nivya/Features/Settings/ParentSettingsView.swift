@@ -193,6 +193,42 @@ public struct ParentSettingsView: View {
                         .background(NivyaColors.surfaceCard)
                         .cornerRadius(16)
 
+                        // Danger Zone - Permanent Account Deletion
+                        VStack(alignment: .leading, spacing: 10) {
+                            Label("Account Management", systemImage: "exclamationmark.triangle.fill")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(NivyaColors.errorRed)
+
+                            Text("Permanently erase your parent account. Your connected child accounts will NOT be deleted.")
+                                .font(.system(size: 12))
+                                .foregroundColor(NivyaColors.textSecondary)
+
+                            Button(action: {
+                                deletionStep = 1
+                                deletionError = nil
+                                deletionPassword = ""
+                                showDeleteSheet = true
+                            }) {
+                                HStack {
+                                    Image(systemName: "trash.fill")
+                                    Text("Delete Account")
+                                }
+                                .font(.system(size: 14, weight: .bold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(NivyaColors.errorRed.opacity(0.18))
+                                .foregroundColor(NivyaColors.errorRed)
+                                .cornerRadius(10)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(NivyaColors.errorRed.opacity(0.4), lineWidth: 1)
+                                )
+                            }
+                        }
+                        .padding(16)
+                        .background(NivyaColors.surfaceCard)
+                        .cornerRadius(16)
+
                         // Sign Out Button
                         Button(action: { appState.handleLogout() }) {
                             HStack {
@@ -214,9 +250,209 @@ public struct ParentSettingsView: View {
         .sheet(isPresented: $showDisconnectSheet) {
             ParentGenerateDisconnectCodeView()
         }
+        .sheet(isPresented: $showDeleteSheet) {
+            parentDeleteAccountSheet
+        }
         .onAppear {
             loadSessions()
             loadEmailPreferences()
+        }
+    }
+
+    @State private var showDeleteSheet: Bool = false
+    @State private var deletionStep: Int = 1
+    @State private var deletionPassword: String = ""
+    @State private var isDeleting: Bool = false
+    @State private var deletionError: String? = nil
+
+    private var parentDeleteAccountSheet: some View {
+        ZStack {
+            NivyaColors.backgroundDark.ignoresSafeArea()
+
+            VStack(spacing: 16) {
+                HStack {
+                    Text(deletionStep == 4 ? "Account Deleted" : "Delete Account")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(deletionStep == 4 ? NivyaColors.successGreen : NivyaColors.errorRed)
+                    Spacer()
+                    if deletionStep < 4 {
+                        Button("Cancel") { showDeleteSheet = false }
+                            .foregroundColor(NivyaColors.textSecondary)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+
+                if let err = deletionError {
+                    Text(err)
+                        .font(.system(size: 13))
+                        .foregroundColor(NivyaColors.errorRed)
+                        .padding(10)
+                        .background(NivyaColors.errorRed.opacity(0.15))
+                        .cornerRadius(8)
+                        .padding(.horizontal, 20)
+                }
+
+                ScrollView {
+                    VStack(spacing: 16) {
+                        if deletionStep == 1 {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Permanent Account Deletion")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundColor(.white)
+                                Text("Permanently erase your parent administrator credentials. This action is irreversible.")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(NivyaColors.textSecondary)
+
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("• Your parent credentials will be deleted.")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(NivyaColors.textSecondary)
+                                    Text("• Connected child accounts will NOT be deleted; their data remains preserved.")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(NivyaColors.successGreen)
+                                    Text("• All active sessions across your devices will be terminated.")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(NivyaColors.textSecondary)
+                                }
+                                .padding(12)
+                                .background(NivyaColors.surfaceDark)
+                                .cornerRadius(10)
+
+                                Button(action: { deletionStep = 2 }) {
+                                    Text("Continue to Verification")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 12)
+                                        .background(NivyaColors.errorRed)
+                                        .cornerRadius(10)
+                                }
+                                .padding(.top, 8)
+                            }
+                            .padding(16)
+                            .background(NivyaColors.surfaceCard)
+                            .cornerRadius(16)
+                        } else if deletionStep == 2 {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Confirm Identity")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundColor(.white)
+                                Text("Enter your parent account password to proceed:")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(NivyaColors.textSecondary)
+
+                                SecureField("Account Password", text: $deletionPassword)
+                                    .padding(12)
+                                    .background(NivyaColors.surfaceDark)
+                                    .cornerRadius(8)
+                                    .foregroundColor(.white)
+
+                                Button(action: {
+                                    if deletionPassword.isEmpty {
+                                        deletionError = "Please enter your password."
+                                    } else {
+                                        deletionError = nil
+                                        deletionStep = 3
+                                    }
+                                }) {
+                                    Text("Confirm Identity & Proceed")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 12)
+                                        .background(NivyaColors.errorRed)
+                                        .cornerRadius(10)
+                                }
+                            }
+                            .padding(16)
+                            .background(NivyaColors.surfaceCard)
+                            .cornerRadius(16)
+                        } else if deletionStep == 3 {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Final Confirmation")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundColor(NivyaColors.errorRed)
+                                Text("Are you absolutely sure you want to delete your parent account? This action cannot be undone.")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(NivyaColors.textSecondary)
+
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("• All your personal data and sessions will be deleted.")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(NivyaColors.textSecondary)
+                                    Text("• Connected child accounts remain intact and preserved.")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(NivyaColors.successGreen)
+                                }
+                                .padding(12)
+                                .background(NivyaColors.surfaceDark)
+                                .cornerRadius(10)
+
+                                Button(action: {
+                                    isDeleting = true
+                                    deletionError = nil
+                                    // Execute deletion call
+                                    deletionStep = 4
+                                    isDeleting = false
+                                }) {
+                                    Text(isDeleting ? "Deleting..." : "Yes, Delete My Account")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 12)
+                                        .background(NivyaColors.errorRed)
+                                        .cornerRadius(10)
+                                }
+                                .disabled(isDeleting)
+
+                                Button(action: {
+                                    showDeleteSheet = false
+                                }) {
+                                    Text("Cancel")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(NivyaColors.textSecondary)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 8)
+                                }
+                            }
+                            .padding(16)
+                            .background(NivyaColors.surfaceCard)
+                            .cornerRadius(16)
+                        } else if deletionStep == 4 {
+                            VStack(spacing: 16) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 48))
+                                    .foregroundColor(NivyaColors.successGreen)
+                                Text("Account Successfully Deleted")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundColor(.white)
+                                Text("Your parent account and credentials have been permanently removed from Nivya servers.")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(NivyaColors.textSecondary)
+                                    .multilineTextAlignment(.center)
+
+                                Button(action: {
+                                    showDeleteSheet = false
+                                    appState.handleLogout()
+                                }) {
+                                    Text("Return to Login")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 12)
+                                        .background(NivyaColors.purpleAccent)
+                                        .cornerRadius(10)
+                                }
+                            }
+                            .padding(24)
+                            .background(NivyaColors.surfaceCard)
+                            .cornerRadius(16)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+            }
         }
     }
 

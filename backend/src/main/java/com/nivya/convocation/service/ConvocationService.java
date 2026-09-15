@@ -79,8 +79,24 @@ public class ConvocationService {
         FamilyMember parentMember = getFamilyMember(principal.getId());
         Long familyId = parentMember.getFamily().getId();
 
-        // Resolve Child recipient
+        // Resolve Child recipient dynamically from authenticated family context
         Long receiverUserId = request.getReceiverUserId();
+        if (receiverUserId != null) {
+            Optional<FamilyMember> memberOpt = familyMemberRepository.findByFamilyIdAndUserId(familyId, receiverUserId);
+            if (memberOpt.isEmpty() || !RoleType.CHILD.equals(memberOpt.get().getMemberRole())) {
+                log.warn("Provided receiverUserId {} is not a valid child member in family {}. Resolving from family context.", receiverUserId, familyId);
+                receiverUserId = null;
+            }
+        }
+        if (receiverUserId == null && request.getTargetDeviceId() != null) {
+            Optional<Device> targetDevice = deviceRepository.findById(request.getTargetDeviceId());
+            if (targetDevice.isPresent() && targetDevice.get().getUser() != null) {
+                Long devUserId = targetDevice.get().getUser().getId();
+                if (familyMemberRepository.existsByFamilyIdAndUserId(familyId, devUserId)) {
+                    receiverUserId = devUserId;
+                }
+            }
+        }
         if (receiverUserId == null) {
             receiverUserId = findChildInFamily(familyId).getUser().getId();
         } else {
@@ -93,6 +109,12 @@ public class ConvocationService {
                 receiverUserId,
                 request.getMessage().trim()
         );
+        if (request.getReplyToId() != null) {
+            Optional<ConvocationMessage> replyTarget = messageRepository.findById(request.getReplyToId());
+            if (replyTarget.isPresent() && replyTarget.get().getFamilyId().equals(familyId)) {
+                message.setReplyToId(replyTarget.get().getId());
+            }
+        }
 
         message = messageRepository.save(message);
         log.info("Parent {} sent convocation message {} to child {}", principal.getId(), message.getId(), receiverUserId);
@@ -124,11 +146,13 @@ public class ConvocationService {
         List<ConvocationMessage> messages = messageRepository.findByFamilyIdOrderByCreatedAtAsc(familyId);
         Map<Long, String> userNames = new HashMap<>();
 
-        return messages.stream().map(m -> {
-            String senderName = userNames.computeIfAbsent(m.getSenderUserId(), id ->
-                    userRepository.findById(id).map(User::getName).orElse("Family Member"));
-            return toParentDto(m, senderName);
-        }).collect(Collectors.toList());
+        return messages.stream()
+                .filter(m -> !"UNSENT".equalsIgnoreCase(m.getStatus()))
+                .map(m -> {
+                    String senderName = userNames.computeIfAbsent(m.getSenderUserId(), id ->
+                            userRepository.findById(id).map(User::getName).orElse("Family Member"));
+                    return toParentDto(m, senderName);
+                }).collect(Collectors.toList());
     }
 
     /**
@@ -147,6 +171,103 @@ public class ConvocationService {
             seenMap.put(m.getId(), isSeen);
         }
         return seenMap;
+    }
+
+    /**
+     * Parent unsends a Parent-owned message.
+     * Validates ownership, family boundaries, and ensures Child messages cannot be unsent by Parent.
+     */
+    @Transactional
+    public void parentUnsendMessage(UserPrincipal principal, Long messageId) {
+        validateParentRole(principal);
+        FamilyMember parentMember = getFamilyMember(principal.getId());
+        Long familyId = parentMember.getFamily().getId();
+
+        ConvocationMessage message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Convocation message not found"));
+
+        if (!message.getFamilyId().equals(familyId)) {
+            throw new AccessDeniedException("Message does not belong to this family unit");
+        }
+
+        if ("CHILD_SENT".equalsIgnoreCase(message.getStatus()) || !message.getSenderUserId().equals(principal.getId())) {
+            throw new AccessDeniedException("Cannot unsend messages sent by other family members");
+        }
+
+        message.setStatus("UNSENT");
+        messageRepository.save(message);
+        log.info("Parent {} unsent convocation message {}", principal.getId(), messageId);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("action", "UNSEND");
+        payload.put("messageId", messageId);
+        realtimeBroadcastService.broadcastConvocationAction(familyId, payload);
+    }
+
+    /**
+     * Parent toggles pin state on a message in the family audit log.
+     */
+    @Transactional
+    public ParentConvocationMessageDto parentTogglePinMessage(UserPrincipal principal, Long messageId) {
+        validateParentRole(principal);
+        FamilyMember parentMember = getFamilyMember(principal.getId());
+        Long familyId = parentMember.getFamily().getId();
+
+        ConvocationMessage message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Convocation message not found"));
+
+        if (!message.getFamilyId().equals(familyId)) {
+            throw new AccessDeniedException("Message does not belong to this family unit");
+        }
+
+        message.setPinned(!message.isPinned());
+        message = messageRepository.save(message);
+        log.info("Parent {} toggled pin on message {} -> {}", principal.getId(), messageId, message.isPinned());
+
+        String senderName = userRepository.findById(message.getSenderUserId())
+                .map(User::getName).orElse("Family Member");
+        ParentConvocationMessageDto dto = toParentDto(message, senderName);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("action", "PIN_TOGGLE");
+        payload.put("messageId", messageId);
+        payload.put("isPinned", message.isPinned());
+        realtimeBroadcastService.broadcastConvocationAction(familyId, payload);
+
+        return dto;
+    }
+
+    /**
+     * Parent reacts to a Child or Parent message in Convocation.
+     */
+    @Transactional
+    public ParentConvocationMessageDto parentReactToMessage(UserPrincipal principal, Long messageId, String reaction) {
+        validateParentRole(principal);
+        FamilyMember parentMember = getFamilyMember(principal.getId());
+        Long familyId = parentMember.getFamily().getId();
+
+        ConvocationMessage message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Convocation message not found"));
+
+        if (!message.getFamilyId().equals(familyId)) {
+            throw new AccessDeniedException("Message does not belong to this family unit");
+        }
+
+        message.setReaction(reaction);
+        message = messageRepository.save(message);
+        log.info("Parent {} reacted {} on message {}", principal.getId(), reaction, messageId);
+
+        String senderName = userRepository.findById(message.getSenderUserId())
+                .map(User::getName).orElse("Family Member");
+        ParentConvocationMessageDto dto = toParentDto(message, senderName);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("action", "REACTION");
+        payload.put("messageId", messageId);
+        payload.put("reaction", reaction);
+        realtimeBroadcastService.broadcastConvocationAction(familyId, payload);
+
+        return dto;
     }
 
     // =========================================================================
@@ -213,26 +334,18 @@ public class ConvocationService {
             realtimeBroadcastService.broadcastConvocationSeen(familyId, seenIds, now.toString());
         }
 
-        // 2. Fetch all actively visible messages (2-minute server window + 1-hour absolute window)
-        List<ConvocationMessage> visibleMessages = messageRepository
-                .findActivelyVisibleMessages(principal.getId(), familyId, now);
-
-        Instant maxExpiry = visibleMessages.stream()
-                .map(ConvocationMessage::getVisibilityExpiresAt)
-                .filter(Objects::nonNull)
-                .max(Instant::compareTo)
-                .orElse(sessionExpiresAt);
-
-        long remainingSeconds = Math.max(0, Duration.between(now, maxExpiry).getSeconds());
-
-        List<ChildConvocationMessageDto> dtos = visibleMessages.stream()
+        // 2. Return the unread messages activated for viewing in this session
+        // Requirement 17: Old seen messages leave the visible set and do not reappear when new messages arrive
+        List<ChildConvocationMessageDto> dtos = unreadMessages.stream()
                 .map(this::toChildDto)
                 .collect(Collectors.toList());
+
+        long remainingSeconds = unreadMessages.isEmpty() ? 0 : 120;
 
         return new ChildViewingSessionResponse(
                 sessionUuid,
                 now,
-                maxExpiry,
+                sessionExpiresAt,
                 remainingSeconds,
                 dtos
         );
@@ -372,7 +485,7 @@ public class ConvocationService {
         boolean isChildOriginated = "CHILD_SENT".equalsIgnoreCase(m.getStatus());
         boolean isSeen = m.getSeenAt() != null || "SEEN".equalsIgnoreCase(m.getStatus());
 
-        return new ParentConvocationMessageDto(
+        ParentConvocationMessageDto dto = new ParentConvocationMessageDto(
                 m.getId(),
                 m.getSenderUserId(),
                 senderName,
@@ -381,8 +494,14 @@ public class ConvocationService {
                 isChildOriginated,
                 m.getCreatedAt(),
                 isSeen,
-                m.getSeenAt()
+                m.getSeenAt(),
+                m.isPinned(),
+                m.getReaction(),
+                m.getReplyToId(),
+                m.getStatus()
         );
+        dto.setFamilyId(m.getFamilyId());
+        return dto;
     }
 
     private ChildConvocationMessageDto toChildDto(ConvocationMessage m) {
