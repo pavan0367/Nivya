@@ -1,6 +1,9 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
-const API_BASE = '/api/v1';
+// Resolve API base URL: defaults to local relative '/api/v1' in development,
+// or uses VITE_API_BASE_URL (e.g. 'https://nivya-blbf.onrender.com/api/v1') in production.
+const rawApiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+export const API_BASE = rawApiBase ? rawApiBase.replace(/\/+$/, '') : '/api/v1';
 
 export const apiClient = axios.create({
   baseURL: API_BASE,

@@ -1,6 +1,11 @@
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 
+// Resolve WebSocket base URL: defaults to local relative '/ws' in development,
+// or uses VITE_WS_BASE_URL (e.g. 'https://nivya-blbf.onrender.com/ws') in production.
+const rawWsBase = (import.meta.env.VITE_WS_BASE_URL as string | undefined)?.trim();
+export const WS_BASE = rawWsBase ? rawWsBase.replace(/\/+$/, '') : '/ws';
+
 export type WebSocketConnectionStatus = 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED' | 'RECONNECTING';
 export type StompMessageCallback = (body: any) => void;
 
@@ -21,12 +26,14 @@ class WebSocketManager {
   private readonly baseDelay = 1000;
   private readonly maxDelay = 30000;
 
-  connect() {
+  constructor() {}
+
+  public connect() {
     this.isManuallyClosed = false;
-    if (this.client && (this.client.active || this.status === 'CONNECTED')) {
+    if (this.status === 'CONNECTED' || this.status === 'CONNECTING') {
       return;
     }
-    this.initiateConnection(false);
+    this.initiateConnection();
   }
 
   private setStatus(newStatus: WebSocketConnectionStatus) {
@@ -56,7 +63,7 @@ class WebSocketManager {
     this.activeSubscriptions.clear();
 
     this.client = new Client({
-      webSocketFactory: () => new SockJS('/ws'),
+      webSocketFactory: () => new SockJS(WS_BASE),
       connectHeaders: token ? { Authorization: `Bearer ${token}` } : {},
       debug: (_str) => {},
       reconnectDelay: 0, // We handle exponential backoff manually

@@ -3,8 +3,9 @@ import {
   HistoryFilterParams,
   HistoryPageResponse,
 } from '../types/history';
+import { API_BASE } from './api';
 
-const BASE_URL = '/api/v1/history';
+const BASE_URL = `${API_BASE}/history`;
 
 /**
  * Service providing API client calls for Nivya Parent-Only History

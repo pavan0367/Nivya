@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_BASE } from '../../services/api';
 import './RoleSelection.css';
 
 export type RoleType = 'PARENT' | 'CHILD';
@@ -26,7 +27,7 @@ export const RoleSelection: React.FC<RoleSelectionProps> = ({
       // In web app, calls POST /api/v1/role/select with Authorization Bearer
       const token = localStorage.getItem('accessToken');
       if (token) {
-        const response = await fetch('/api/v1/role/select', {
+        const response = await fetch(`${API_BASE}/role/select`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

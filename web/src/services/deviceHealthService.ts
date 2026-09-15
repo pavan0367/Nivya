@@ -1,6 +1,7 @@
 import { DeviceHealthResponse, ChildDeviceHealthResponse, DeviceHealthTelemetryRequest } from '../types/deviceHealth';
+import { API_BASE } from './api';
 
-const BASE_URL = '/api/v1/device/health';
+const BASE_URL = `${API_BASE}/device/health`;
 
 /**
  * Service providing API client calls for Nivya Device Health

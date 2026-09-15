@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE } from '../../services/api';
 import './PairingScreen.css';
 
 export interface DeviceStatusItem {
@@ -80,7 +81,7 @@ export const PairingScreen: React.FC<PairingScreenProps> = ({
     setIsLoadingCode(true);
     setErrorMessage(null);
     try {
-      const res = await fetch('/api/v1/pairing/code', {
+      const res = await fetch(`${API_BASE}/pairing/code`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -108,7 +109,7 @@ export const PairingScreen: React.FC<PairingScreenProps> = ({
 
   const checkPairingStatus = async () => {
     try {
-      const res = await fetch('/api/v1/pairing/status', {
+      const res = await fetch(`${API_BASE}/pairing/status`, {
         headers: { ...getAuthHeader() }
       });
       if (res.ok) {
@@ -143,7 +144,7 @@ export const PairingScreen: React.FC<PairingScreenProps> = ({
     localStorage.setItem('deviceUuid', deviceUuid);
 
     try {
-      const res = await fetch('/api/v1/pairing/connect', {
+      const res = await fetch(`${API_BASE}/pairing/connect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
