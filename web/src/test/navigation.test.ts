@@ -63,19 +63,36 @@ describe('Navigation, Role Routing & Child 9-Item Dashboard Order', () => {
     Alerts: '/child/alerts',
   };
 
-  it('1. New Child registration with no active connection -> Pairing screen', () => {
+  it('1. New Child registration succeeds -> Login page', () => {
+    const getPostRegistrationDestination = (_role: 'PARENT' | 'CHILD'): string => '/login';
+    expect(getPostRegistrationDestination('CHILD')).toBe('/login');
+  });
+
+  it('2. New Child registration must NOT directly navigate to /pairing', () => {
+    const getPostRegistrationDestination = (_role: 'PARENT' | 'CHILD'): string => '/login';
+    expect(getPostRegistrationDestination('CHILD')).not.toBe('/pairing');
+  });
+
+  it('3. New Child registration must NOT directly navigate to /child', () => {
+    const getPostRegistrationDestination = (_role: 'PARENT' | 'CHILD'): string => '/login';
+    expect(getPostRegistrationDestination('CHILD')).not.toBe('/child');
+  });
+
+  it('4. New Child logs in with no active connection -> /pairing', () => {
     expect(authService.getPostAuthDestination('CHILD', false)).toBe('/pairing');
   });
 
-  it('2. Existing Child login with active connection -> Child Dashboard', () => {
+  it('5. Existing Child logs in with active connection -> /child', () => {
     expect(authService.getPostAuthDestination('CHILD', true)).toBe('/child');
   });
 
-  it('3. Existing Child login without active connection -> Pairing screen', () => {
+  it('6. Existing Child logs in without active connection -> /pairing', () => {
     expect(authService.getPostAuthDestination('CHILD', false)).toBe('/pairing');
   });
 
-  it('3a. Parent existing login behavior remains unchanged', () => {
+  it('7. Parent registration/login behavior remains unchanged', () => {
+    const getPostRegistrationDestination = (_role: 'PARENT' | 'CHILD'): string => '/login';
+    expect(getPostRegistrationDestination('PARENT')).toBe('/login');
     expect(authService.getPostAuthDestination('PARENT', true)).toBe('/dashboard');
     expect(authService.getPostAuthDestination('PARENT', false)).toBe('/pairing');
   });

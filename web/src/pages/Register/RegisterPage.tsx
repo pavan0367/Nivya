@@ -52,13 +52,13 @@ export const RegisterPage: React.FC = () => {
         import.meta.env.VITE_EMAIL_VERIFICATION_REQUIRED !== 'false' &&
         data?.user?.status === 'PENDING';
 
-      if (isVerificationRequired) {
-        // Clear auto-saved auth tokens so user explicitly verifies & logs in
-        localStorage.removeItem('nivya_access_token');
-        localStorage.removeItem('nivya_refresh_token');
-        localStorage.removeItem('nivya_user_role');
-        localStorage.removeItem('nivya_user');
+      // Clear auto-saved auth tokens so user explicitly logs in on Login page
+      localStorage.removeItem('nivya_access_token');
+      localStorage.removeItem('nivya_refresh_token');
+      localStorage.removeItem('nivya_user_role');
+      localStorage.removeItem('nivya_user');
 
+      if (isVerificationRequired) {
         setSuccessMessage('Account created! A verification code has been dispatched to your email.');
         setTimeout(() => {
           navigate(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}`, {
@@ -68,29 +68,7 @@ export const RegisterPage: React.FC = () => {
             },
           });
         }, 1000);
-      } else if (role === 'CHILD') {
-        // NEW CHILD REGISTRATION: Check active connection and navigate to pairing
-        setSuccessMessage('Account created! Connecting to family pairing...');
-        try {
-          const pairingStatus = await authService.getPairingStatus();
-          const target = authService.getPostAuthDestination('CHILD', pairingStatus.paired);
-          setTimeout(() => {
-            navigate(target, { replace: true });
-          }, 1000);
-        } catch (pairErr) {
-          console.warn('Could not determine live pairing status; checking local state:', pairErr);
-          const target = authService.getPostAuthDestination('CHILD', authService.isPaired());
-          setTimeout(() => {
-            navigate(target, { replace: true });
-          }, 1000);
-        }
       } else {
-        // PARENT REGISTRATION: Preserve current Parent registration behavior
-        localStorage.removeItem('nivya_access_token');
-        localStorage.removeItem('nivya_refresh_token');
-        localStorage.removeItem('nivya_user_role');
-        localStorage.removeItem('nivya_user');
-
         setSuccessMessage('Account created successfully! Redirecting to login...');
         setTimeout(() => {
           navigate('/login', {
