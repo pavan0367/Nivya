@@ -47,7 +47,7 @@ export const RoleAwareLanding: React.FC = () => {
   }
   const role = authService.getUserRole();
   if (role === 'CHILD') {
-    return <Navigate to="/child" replace />;
+    return <Navigate to={authService.getPostAuthDestination('CHILD', authService.isPaired())} replace />;
   }
   return <Navigate to="/dashboard" replace />;
 };

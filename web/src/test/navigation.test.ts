@@ -63,32 +63,21 @@ describe('Navigation, Role Routing & Child 9-Item Dashboard Order', () => {
     Alerts: '/child/alerts',
   };
 
-  it('1. Child login -> /child', () => {
-    const getPostLoginDestination = (role: 'PARENT' | 'CHILD', isPaired: boolean): string => {
-      if (role === 'CHILD') return '/child';
-      return isPaired ? '/dashboard' : '/pairing';
-    };
-
-    expect(getPostLoginDestination('CHILD', true)).toBe('/child');
-    expect(getPostLoginDestination('CHILD', false)).toBe('/child');
+  it('1. New Child registration with no active connection -> Pairing screen', () => {
+    expect(authService.getPostAuthDestination('CHILD', false)).toBe('/pairing');
   });
 
-  it('2. Parent paired login -> /dashboard', () => {
-    const getPostLoginDestination = (role: 'PARENT' | 'CHILD', isPaired: boolean): string => {
-      if (role === 'CHILD') return '/child';
-      return isPaired ? '/dashboard' : '/pairing';
-    };
-
-    expect(getPostLoginDestination('PARENT', true)).toBe('/dashboard');
+  it('2. Existing Child login with active connection -> Child Dashboard', () => {
+    expect(authService.getPostAuthDestination('CHILD', true)).toBe('/child');
   });
 
-  it('3. Parent unpaired login -> /pairing', () => {
-    const getPostLoginDestination = (role: 'PARENT' | 'CHILD', isPaired: boolean): string => {
-      if (role === 'CHILD') return '/child';
-      return isPaired ? '/dashboard' : '/pairing';
-    };
+  it('3. Existing Child login without active connection -> Pairing screen', () => {
+    expect(authService.getPostAuthDestination('CHILD', false)).toBe('/pairing');
+  });
 
-    expect(getPostLoginDestination('PARENT', false)).toBe('/pairing');
+  it('3a. Parent existing login behavior remains unchanged', () => {
+    expect(authService.getPostAuthDestination('PARENT', true)).toBe('/dashboard');
+    expect(authService.getPostAuthDestination('PARENT', false)).toBe('/pairing');
   });
 
   it('4. Child refresh preserves Child role', () => {

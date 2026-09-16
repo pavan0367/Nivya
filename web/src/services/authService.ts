@@ -130,6 +130,13 @@ export const authService = {
     localStorage.setItem('nivya_is_paired', paired ? 'true' : 'false');
   },
 
+  getPostAuthDestination(role: RoleType, paired: boolean): string {
+    if (role === 'CHILD') {
+      return paired ? '/child' : '/pairing';
+    }
+    return paired ? '/dashboard' : '/pairing';
+  },
+
   async getDeletionStatus(): Promise<{
     role: RoleType;
     isChild: boolean;

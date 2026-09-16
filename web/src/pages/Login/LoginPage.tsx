@@ -37,31 +37,32 @@ export const LoginPage: React.FC = () => {
       const data = await authService.login(email, password);
       const userRole = data.user.role;
 
+      // Check server-authoritative pairing status to differentiate paired vs setup-incomplete
+      let isPaired = false;
+      try {
+        const pairingStatus = await authService.getPairingStatus();
+        isPaired = pairingStatus.paired;
+      } catch (pairErr) {
+        console.warn('Could not determine live pairing status; checking local state:', pairErr);
+        isPaired = authService.isPaired();
+      }
+
       if (userRole === 'CHILD') {
-        // Authoritative Child role: always land on Child starting/index page (/child)
-        navigate('/child', { replace: true });
+        // Authoritative Child role: active connection -> /child, no active connection -> /pairing
+        const target = authService.getPostAuthDestination('CHILD', isPaired);
+        navigate(target, { replace: true });
         return;
       }
 
       // PARENT LOGIN: Check pairing state to differentiate already-paired vs setup-incomplete
-      try {
-        const pairingStatus = await authService.getPairingStatus();
-        if (pairingStatus.paired) {
-          // ALREADY PAIRED PARENT: Direct to parent dashboard
-          const origin = (location.state as any)?.from?.pathname;
-          const target = (origin && origin !== '/access-denied' && !origin.startsWith('/child')) ? origin : '/dashboard';
-          navigate(target, { replace: true });
-        } else {
-          // UNPAIRED PARENT: Route to pairing
-          navigate('/pairing', { replace: true });
-        }
-      } catch (pairErr) {
-        console.warn('Could not determine live pairing status; checking local state:', pairErr);
-        if (authService.isPaired()) {
-          navigate('/dashboard', { replace: true });
-        } else {
-          navigate('/pairing', { replace: true });
-        }
+      if (isPaired) {
+        // ALREADY PAIRED PARENT: Direct to parent dashboard
+        const origin = (location.state as any)?.from?.pathname;
+        const target = (origin && origin !== '/access-denied' && !origin.startsWith('/child')) ? origin : '/dashboard';
+        navigate(target, { replace: true });
+      } else {
+        // UNPAIRED PARENT: Route to pairing
+        navigate('/pairing', { replace: true });
       }
     } catch (err: any) {
       console.error('Login failed:', err);
