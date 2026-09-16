@@ -10,6 +10,7 @@ import {
   Bell,
   ChevronRight,
   AlertTriangle,
+  Check,
 } from 'lucide-react';
 import { convocationService } from '../../services/convocationService';
 import { telemetryService } from '../../services/telemetryService';
@@ -501,52 +502,43 @@ export const ChildDashboardPage: React.FC = () => {
         <ChevronRight size={18} color="#64748B" />
       </div>
 
-      {/* Requirement 1: Simplified Success Modal containing ONLY: DONE */}
+      {/* Non-blocking Success Toast: Compact [Check icon] Done! at Top-Center */}
       {showDoneModal && (
         <div
           id="modal-message-sent"
           style={{
             position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(8px)',
+            top: '1.5rem',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1000,
+            pointerEvents: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 100,
-            padding: '1.5rem',
           }}
         >
           <div
-            className="glass-panel"
+            id="toast-done-container"
             style={{
-              maxWidth: '240px',
-              width: '100%',
-              padding: '1.75rem',
-              borderRadius: '20px',
-              textAlign: 'center',
-              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.6)',
-              border: '1px solid rgba(139, 92, 246, 0.3)',
-              background: '#0F172A',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              padding: '0.5rem 1rem',
+              borderRadius: '12px',
+              background: 'rgba(15, 23, 42, 0.95)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid #10B981',
+              color: '#10B981',
+              boxShadow: '0 8px 24px rgba(16, 185, 129, 0.25), 0 4px 12px rgba(0, 0, 0, 0.4)',
+              fontSize: '0.95rem',
+              fontWeight: 700,
+              letterSpacing: '0.02em',
+              whiteSpace: 'nowrap',
             }}
           >
-            <button
-              type="button"
-              id="btn-done-message-sent"
-              onClick={() => setShowDoneModal(false)}
-              className="btn btn-primary"
-              style={{
-                width: '100%',
-                padding: '0.85rem',
-                fontSize: '1.1rem',
-                fontWeight: 800,
-                letterSpacing: '0.06em',
-                borderRadius: '12px',
-                background: '#8B5CF6',
-              }}
-            >
-              DONE
-            </button>
+            <Check size={18} strokeWidth={2.5} color="#10B981" />
+            <span>Done!</span>
           </div>
         </div>
       )}

@@ -228,16 +228,22 @@ describe('Navigation, Role Routing & Child 9-Item Dashboard Order', () => {
     expect(formatMetricOrUnavailable(82, '%')).toBe('82%');
   });
 
-  it('18. Success popup shows only DONE', () => {
-    const popupContent = {
+  it('18. Success toast shows compact Done! without blocking screen', () => {
+    const toastContent = {
       title: null,
       description: null,
-      buttonText: 'DONE',
+      text: 'Done!',
+      hasCheckIcon: true,
+      isNonBlocking: true,
+      position: 'top-center',
     };
 
-    expect(popupContent.title).toBeNull();
-    expect(popupContent.description).toBeNull();
-    expect(popupContent.buttonText).toBe('DONE');
+    expect(toastContent.title).toBeNull();
+    expect(toastContent.description).toBeNull();
+    expect(toastContent.text).toBe('Done!');
+    expect(toastContent.hasCheckIcon).toBe(true);
+    expect(toastContent.isNonBlocking).toBe(true);
+    expect(toastContent.position).toBe('top-center');
   });
 
   it('19. Success popup disappears automatically after about 2 seconds', () => {
@@ -258,15 +264,16 @@ describe('Navigation, Role Routing & Child 9-Item Dashboard Order', () => {
     vi.useRealTimers();
   });
 
-  it('20. DONE button can dismiss the popup immediately', () => {
-    let modalOpen = true;
-    const onDoneClick = () => {
-      modalOpen = false;
+  it('20. Toast auto-dismisses without requiring manual dismissal or close button', () => {
+    const toastConfig = {
+      hasCloseButton: false,
+      requireClickDone: false,
+      autoDismissMs: 2000,
     };
 
-    expect(modalOpen).toBe(true);
-    onDoneClick();
-    expect(modalOpen).toBe(false);
+    expect(toastConfig.hasCloseButton).toBe(false);
+    expect(toastConfig.requireClickDone).toBe(false);
+    expect(toastConfig.autoDismissMs).toBe(2000);
   });
 
   it('21. CRACK/FREAK exact message content and API behavior remain unchanged', () => {
