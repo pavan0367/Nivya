@@ -80,6 +80,11 @@ nivya:
     verification-required: ${EMAIL_VERIFICATION_REQUIRED:false}
     provider: ${EMAIL_PROVIDER:SIMULATION}
     from: ${MAIL_FROM:${EMAIL_FROM:${SMTP_FROM:noreply@nivya.com}}}
+    resend:
+      api-key: ${RESEND_API_KEY:}
+      from: ${RESEND_FROM_EMAIL:${nivya.email.from:onboarding@resend.dev}}
+      api-url: ${RESEND_API_URL:https://api.resend.com/emails}
+      timeout-ms: ${RESEND_TIMEOUT_MS:5000}
     smtp:
       host: ${SMTP_HOST:smtp.gmail.com}
       port: ${SMTP_PORT:587}

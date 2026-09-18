@@ -85,6 +85,9 @@ public class EmailAndSessionIntegrationTest {
     private SesEmailProvider sesEmailProvider;
 
     @Autowired
+    private ResendEmailProvider resendEmailProvider;
+
+    @Autowired
     private EmailProviderFactory emailProviderFactory;
 
     private String parentToken;
@@ -174,11 +177,13 @@ public class EmailAndSessionIntegrationTest {
         assertThat(smtpEmailProvider.getProviderName()).isEqualTo("SMTP");
         assertThat(sendGridEmailProvider.getProviderName()).isEqualTo("SENDGRID");
         assertThat(sesEmailProvider.getProviderName()).isEqualTo("SES");
+        assertThat(resendEmailProvider.getProviderName()).isEqualTo("RESEND");
 
         assertThat(emailProviderFactory.getProvider("SIMULATION")).isNotNull();
         assertThat(emailProviderFactory.getProvider("SMTP")).isNotNull();
         assertThat(emailProviderFactory.getProvider("SENDGRID")).isNotNull();
         assertThat(emailProviderFactory.getProvider("SES")).isNotNull();
+        assertThat(emailProviderFactory.getProvider("RESEND")).isNotNull();
 
         // Simulation dispatch
         var result = simulationEmailProvider.sendEmail("test@nivya.local", "Subject", "<b>Body</b>", "Body");
