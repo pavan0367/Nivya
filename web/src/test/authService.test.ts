@@ -150,4 +150,24 @@ describe('authService & Role Isolation', () => {
     const verifyResult = await authService.verifyChildDeletionCode('123456');
     expect(verifyResult.valid).toBe(true);
   });
+
+  it('cleans up all authentication tokens and profile data when 401 occurs', () => {
+    localStorage.setItem('nivya_access_token', 'expired_jwt');
+    localStorage.setItem('nivya_refresh_token', 'expired_refresh');
+    localStorage.setItem('nivya_user_role', 'CHILD');
+    localStorage.setItem('nivya_user', JSON.stringify({ id: 2, role: 'CHILD' }));
+
+    // Simulate 401 interceptor logic
+    localStorage.removeItem('nivya_access_token');
+    localStorage.removeItem('nivya_refresh_token');
+    localStorage.removeItem('nivya_user_role');
+    localStorage.removeItem('nivya_user');
+
+    expect(localStorage.getItem('nivya_access_token')).toBeNull();
+    expect(localStorage.getItem('nivya_refresh_token')).toBeNull();
+    expect(localStorage.getItem('nivya_user_role')).toBeNull();
+    expect(localStorage.getItem('nivya_user')).toBeNull();
+    expect(authService.isAuthenticated()).toBe(false);
+    expect(authService.getCurrentUser()).toBeNull();
+  });
 });

@@ -30,9 +30,11 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     if (error.response?.status === 401) {
-      // Clear token & trigger redirect to login
+      // Clear all authentication & session tokens, trigger redirect to login
       localStorage.removeItem('nivya_access_token');
+      localStorage.removeItem('nivya_refresh_token');
       localStorage.removeItem('nivya_user_role');
+      localStorage.removeItem('nivya_user');
       if (!window.location.pathname.includes('/login')) {
         window.location.href = '/login?expired=true';
       }
