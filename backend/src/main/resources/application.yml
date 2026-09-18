@@ -85,6 +85,12 @@ nivya:
       from: ${RESEND_FROM_EMAIL:${nivya.email.from:onboarding@resend.dev}}
       api-url: ${RESEND_API_URL:https://api.resend.com/emails}
       timeout-ms: ${RESEND_TIMEOUT_MS:5000}
+    brevo:
+      api-key: ${BREVO_API_KEY:}
+      from: ${BREVO_FROM_EMAIL:${nivya.email.from:breversupport@gmail.com}}
+      from-name: ${BREVO_FROM_NAME:Nivya}
+      api-url: ${BREVO_API_URL:https://api.brevo.com/v3/smtp/email}
+      timeout-ms: ${BREVO_TIMEOUT_MS:5000}
     smtp:
       host: ${SMTP_HOST:smtp.gmail.com}
       port: ${SMTP_PORT:587}

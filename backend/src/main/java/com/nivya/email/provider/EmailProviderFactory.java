@@ -48,13 +48,8 @@ public class EmailProviderFactory {
             return provider;
         }
 
-        log.warn("Active provider '{}' not found. Defaulting to SIMULATION provider.", activeProviderName);
-        EmailProvider fallback = providers.get("SIMULATION");
-        if (fallback != null) {
-            return fallback;
-        }
-
-        throw new IllegalStateException("No valid EmailProvider bean available. Registered providers: " + providers.keySet());
+        throw new IllegalArgumentException("Configured email provider '" + activeProviderName +
+                "' is not registered. Registered providers: " + providers.keySet());
     }
 
     public EmailProvider getProvider(String name) {
@@ -66,8 +61,8 @@ public class EmailProviderFactory {
         if (provider != null) {
             return provider;
         }
-        log.warn("Requested provider '{}' not found. Returning active provider '{}'", name, activeProviderName);
-        return getProvider();
+        throw new IllegalArgumentException("Requested email provider '" + name +
+                "' is not registered. Registered providers: " + providers.keySet());
     }
 
     public String getActiveProviderName() {
