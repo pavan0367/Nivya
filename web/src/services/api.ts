@@ -42,3 +42,24 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// In-flight GET request deduplication to prevent duplicate simultaneous socket requests
+const inFlightGetRequests = new Map<string, Promise<any>>();
+
+const originalGet = apiClient.get.bind(apiClient);
+
+apiClient.get = ((url: string, config?: any): Promise<any> => {
+  const key = `${url}?${config?.params ? JSON.stringify(config.params) : ''}`;
+  if (inFlightGetRequests.has(key)) {
+    return inFlightGetRequests.get(key)!;
+  }
+
+  const promise = originalGet(url, config).finally(() => {
+    inFlightGetRequests.delete(key);
+  });
+
+  inFlightGetRequests.set(key, promise);
+  return promise;
+}) as typeof apiClient.get;
+
+

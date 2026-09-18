@@ -89,9 +89,18 @@ export const SettingsPage: React.FC = () => {
       const currentUser = authService.getCurrentUser();
       setUser(currentUser);
 
-      const devs = await authService.getFamilyDevices();
-      if (devs && devs.length > 0) {
-        setDevices(devs);
+      // Fetch independent settings resources in parallel
+      const [devsRes, sessRes, emailRes, pairRes] = await Promise.allSettled([
+        authService.getFamilyDevices(),
+        apiClient.get('/sessions'),
+        apiClient.get('/email/preferences'),
+        apiClient.post('/pairing/code', {
+          deviceFingerprint: navigator.userAgent,
+        }),
+      ]);
+
+      if (devsRes.status === 'fulfilled' && devsRes.value && devsRes.value.length > 0) {
+        setDevices(devsRes.value);
       } else {
         setDevices([
           {
@@ -107,14 +116,9 @@ export const SettingsPage: React.FC = () => {
         ]);
       }
 
-      // Load active device sessions
-      try {
-        const sessRes = await apiClient.get('/sessions');
-        if (sessRes.data?.data) {
-          setSessions(sessRes.data.data);
-        }
-      } catch (sessErr) {
-        console.warn('Sessions endpoint not available or empty, using local session state:', sessErr);
+      if (sessRes.status === 'fulfilled' && sessRes.value?.data?.data) {
+        setSessions(sessRes.value.data.data);
+      } else {
         setSessions([
           {
             id: 1,
@@ -131,26 +135,12 @@ export const SettingsPage: React.FC = () => {
         ]);
       }
 
-      // Load email notification preferences
-      try {
-        const emailRes = await apiClient.get('/email/preferences');
-        if (emailRes.data?.data) {
-          setEmailPrefs(emailRes.data.data);
-        }
-      } catch (prefErr) {
-        console.warn('Email preferences not available:', prefErr);
+      if (emailRes.status === 'fulfilled' && emailRes.value?.data?.data) {
+        setEmailPrefs(emailRes.value.data.data);
       }
 
-      // Fetch dynamic active pairing code if available
-      try {
-        const pairRes = await apiClient.post('/pairing/code', {
-          deviceFingerprint: navigator.userAgent,
-        });
-        if (pairRes.data?.data?.code) {
-          setPairingCode(pairRes.data.data.code);
-        }
-      } catch {
-        // Keep initial placeholder
+      if (pairRes.status === 'fulfilled' && pairRes.value?.data?.data?.code) {
+        setPairingCode(pairRes.value.data.data.code);
       }
     } catch (err: any) {
       setError(err.message || 'Failed to load platform settings');

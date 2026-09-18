@@ -43,7 +43,10 @@ export const DashboardLayout: React.FC = () => {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [devices, setDevices] = useState<Device[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(() => {
+    const saved = localStorage.getItem('nivya_parent_active_device_id') || localStorage.getItem('nivya_active_device_id');
+    return saved ? Number(saved) : null;
+  });
   const [unreadAlerts, setUnreadAlerts] = useState<number>(0);
   const [wsStatus, setWsStatus] = useState<WebSocketConnectionStatus>(websocketService.getStatus());
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import {
   BatteryCharging,
@@ -23,11 +23,24 @@ export const ChildDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { activeDeviceId } = useOutletContext<ChildOutletContext>();
 
-  // Dialog & Dispatch States
-  const [isSendingCrack, setIsSendingCrack] = useState(false);
-  const [isSendingFreak, setIsSendingFreak] = useState(false);
+  // Delayed Visual States — "Sending..." is exception-only (shown only after grace period)
+  const [showCrackSending, setShowCrackSending] = useState(false);
+  const [showFreakSending, setShowFreakSending] = useState(false);
   const [showDoneModal, setShowDoneModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // In-flight dispatch tracking without UI blocking
+  const isCrackInFlight = useRef(false);
+  const isFreakInFlight = useRef(false);
+  const crackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const freakTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (crackTimerRef.current) clearTimeout(crackTimerRef.current);
+      if (freakTimerRef.current) clearTimeout(freakTimerRef.current);
+    };
+  }, []);
 
   // Real Telemetry States — No fake / hardcoded values
   const [battery, setBattery] = useState<BatteryStatus | null>(null);
@@ -78,37 +91,61 @@ export const ChildDashboardPage: React.FC = () => {
 
   // CRACK: Immediate dispatch of exact "Mom,here"
   const handleSendCrack = async () => {
-    if (isSendingCrack || isSendingFreak) return;
-    setIsSendingCrack(true);
+    if (isCrackInFlight.current || isFreakInFlight.current) return;
+    isCrackInFlight.current = true;
     setErrorMessage(null);
 
+    // Grace period timer: Only show "Sending..." if request remains delayed after 400ms
+    crackTimerRef.current = setTimeout(() => {
+      if (isCrackInFlight.current) {
+        setShowCrackSending(true);
+      }
+    }, 400);
+
     try {
+      // 1. Start real backend request IMMEDIATELY without delay
       await convocationService.childSendMessage('Mom,here');
+      // 2. Only show approved DONE toast on actual backend success
       setShowDoneModal(true);
     } catch (err: any) {
       console.error('Failed to send CRACK note:', err);
-      // Ensure reliable UI response without failing silently
-      setShowDoneModal(true);
+      // Requirement 16: Do NOT show fake DONE on failure. Keep screen usable with error message.
+      const msg = err.response?.data?.message || 'Failed to send message. Please check connection.';
+      setErrorMessage(msg);
     } finally {
-      setIsSendingCrack(false);
+      if (crackTimerRef.current) clearTimeout(crackTimerRef.current);
+      isCrackInFlight.current = false;
+      setShowCrackSending(false);
     }
   };
 
   // FREAK: Immediate dispatch of exact "Someone's,here"
   const handleSendFreak = async () => {
-    if (isSendingCrack || isSendingFreak) return;
-    setIsSendingFreak(true);
+    if (isCrackInFlight.current || isFreakInFlight.current) return;
+    isFreakInFlight.current = true;
     setErrorMessage(null);
 
+    // Grace period timer: Only show "Sending..." if request remains delayed after 400ms
+    freakTimerRef.current = setTimeout(() => {
+      if (isFreakInFlight.current) {
+        setShowFreakSending(true);
+      }
+    }, 400);
+
     try {
+      // 1. Start real backend request IMMEDIATELY without delay
       await convocationService.childSendMessage("Someone's,here");
+      // 2. Only show approved DONE toast on actual backend success
       setShowDoneModal(true);
     } catch (err: any) {
       console.error('Failed to send FREAK note:', err);
-      // Ensure reliable UI response without failing silently
-      setShowDoneModal(true);
+      // Requirement 16: Do NOT show fake DONE on failure. Keep screen usable with error message.
+      const msg = err.response?.data?.message || 'Failed to send message. Please check connection.';
+      setErrorMessage(msg);
     } finally {
-      setIsSendingFreak(false);
+      if (freakTimerRef.current) clearTimeout(freakTimerRef.current);
+      isFreakInFlight.current = false;
+      setShowFreakSending(false);
     }
   };
 
@@ -235,7 +272,7 @@ export const ChildDashboardPage: React.FC = () => {
           type="button"
           id="child-btn-crack"
           onClick={handleSendCrack}
-          disabled={isSendingCrack || isSendingFreak}
+          disabled={showCrackSending || showFreakSending}
           style={{
             width: '100%',
             height: '62px',
@@ -254,7 +291,7 @@ export const ChildDashboardPage: React.FC = () => {
             transition: 'transform 0.15s ease, filter 0.15s ease',
           }}
         >
-          {isSendingCrack ? 'SENDING...' : 'CRACK'}
+          {showCrackSending ? 'Sending...' : 'CRACK'}
         </button>
 
         {/* 4. FREAK (Immediate send of "Someone's,here") */}
@@ -262,7 +299,7 @@ export const ChildDashboardPage: React.FC = () => {
           type="button"
           id="child-btn-freak"
           onClick={handleSendFreak}
-          disabled={isSendingCrack || isSendingFreak}
+          disabled={showCrackSending || showFreakSending}
           style={{
             width: '100%',
             height: '62px',
@@ -281,7 +318,7 @@ export const ChildDashboardPage: React.FC = () => {
             transition: 'transform 0.15s ease, filter 0.15s ease',
           }}
         >
-          {isSendingFreak ? 'SENDING...' : 'FREAK'}
+          {showFreakSending ? 'Sending...' : 'FREAK'}
         </button>
       </div>
 
