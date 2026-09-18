@@ -79,6 +79,16 @@ export const SettingsPage: React.FC = () => {
   const [verifyingCode, setVerifyingCode] = useState<boolean>(false);
   const [deletionError, setDeletionError] = useState<string | null>(null);
   const [deletingAccount, setDeletingAccount] = useState<boolean>(false);
+  const [codeResentNotice, setCodeResentNotice] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState<number>(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
 
   const loadSettings = async (isInitial = false) => {
     if (isInitial) setLoading(true);
@@ -192,12 +202,17 @@ export const SettingsPage: React.FC = () => {
     setChildApprovalCode('');
     setCodeRequested(false);
     setDeletionError(null);
+    setCodeResentNotice(null);
+    setResendCooldown(0);
     setTimerSeconds(900);
   };
 
-  const handleRequestChildCode = async () => {
+  const handleRequestChildCode = async (isResend: boolean | unknown = false) => {
+    const resend = isResend === true;
+    if (resendCooldown > 0) return;
     setRequestingCode(true);
     setDeletionError(null);
+    setCodeResentNotice(null);
     try {
       const res = await authService.requestChildDeletionApproval();
       setCodeRequested(true);
@@ -206,6 +221,11 @@ export const SettingsPage: React.FC = () => {
       }
       setTimerSeconds((res.expiresInMinutes || 15) * 60);
       setDeletionStep(2);
+      if (resend || deletionStep === 2) {
+        setCodeResentNotice('New approval code sent to your parent.');
+        setChildApprovalCode('');
+        setResendCooldown(60);
+      }
     } catch (err: any) {
       setDeletionError(err.response?.data?.message || 'Failed to request approval code from parent.');
     } finally {
@@ -1010,7 +1030,10 @@ export const SettingsPage: React.FC = () => {
                         placeholder="123456"
                         maxLength={6}
                         value={childApprovalCode}
-                        onChange={(e) => setChildApprovalCode(e.target.value.replace(/\D/g, ''))}
+                        onChange={(e) => {
+                          setChildApprovalCode(e.target.value.replace(/\D/g, ''));
+                          if (codeResentNotice) setCodeResentNotice(null);
+                        }}
                         style={{
                           width: '180px',
                           letterSpacing: '0.3em',
@@ -1030,14 +1053,37 @@ export const SettingsPage: React.FC = () => {
                       </div>
                     </div>
 
+                    {codeResentNotice && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        padding: '0.5rem 0.75rem',
+                        background: 'rgba(16, 185, 129, 0.1)',
+                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                        borderRadius: 'var(--radius-md)',
+                        color: '#10B981',
+                        fontSize: '0.85rem',
+                        marginTop: '0.5rem',
+                      }}>
+                        <CheckCircle size={15} />
+                        <span>{codeResentNotice}</span>
+                      </div>
+                    )}
+
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem' }}>
                       <button
                         type="button"
+                        id="btn-resend-child-code"
                         className="btn btn-secondary btn-sm"
-                        onClick={handleRequestChildCode}
-                        disabled={requestingCode}
+                        onClick={() => handleRequestChildCode(true)}
+                        disabled={requestingCode || resendCooldown > 0}
                       >
-                        Resend Code
+                        {requestingCode
+                          ? 'Sending...'
+                          : resendCooldown > 0
+                          ? `Resend in ${resendCooldown}s`
+                          : 'Resend Code'}
                       </button>
 
                       <div style={{ display: 'flex', gap: '0.75rem' }}>

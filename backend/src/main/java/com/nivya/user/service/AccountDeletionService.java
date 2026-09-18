@@ -4,6 +4,7 @@ import com.nivya.audit.service.AuditService;
 import com.nivya.auth.repository.RefreshTokenRepository;
 import com.nivya.device.entity.Device;
 import com.nivya.device.repository.DeviceRepository;
+import com.nivya.email.dto.EmailSendResult;
 import com.nivya.email.provider.EmailProvider;
 import com.nivya.email.provider.EmailProviderFactory;
 import com.nivya.family.entity.Family;
@@ -402,35 +403,11 @@ public class AccountDeletionService {
     }
 
     private void dispatchParentApprovalEmail(User parent, User child, String rawCode) {
-        String subject = "Nivya - Child Account Deletion Request";
-        String bodyText = "Nivya\nChild Account Deletion Request\n\n" +
-                "Your connected child (" + child.getName() + " - " + child.getEmail() + ") has requested to permanently delete their Nivya account.\n\n" +
-                "To approve this deletion, provide them with this 6-digit approval code:\n" +
-                rawCode + "\n\n" +
-                "This code expires in " + CODE_TTL_MINUTES + " minutes.\n" +
-                "If you did not approve this request, you can safely ignore this email and the child's account will remain active.";
-
-        String bodyHtml = "<!DOCTYPE html><html><head><meta charset='UTF-8'></head>" +
-                "<body style='font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background-color: #0F172A; color: #F8FAFC; padding: 32px 16px; margin: 0;'>" +
-                "<div style='max-width: 500px; margin: 0 auto; background: #1E293B; border-radius: 12px; border: 1px solid #334155; padding: 32px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);'>" +
-                "<div style='margin-bottom: 20px;'><h1 style='color: #EF4444; margin: 0; font-size: 22px; font-weight: 800;'>Nivya</h1>" +
-                "<h2 style='color: #E2E8F0; margin: 6px 0 0 0; font-size: 17px; font-weight: 600;'>Child Account Deletion Request</h2></div>" +
-                "<p style='color: #94A3B8; font-size: 14px; line-height: 1.5; margin: 16px 0;'>" +
-                "Your connected child <strong style='color: #F8FAFC;'>" + child.getName() + "</strong> (" + child.getEmail() + ") has requested to permanently delete their Nivya account." +
-                "</p>" +
-                "<p style='color: #94A3B8; font-size: 14px; margin: 16px 0 8px 0;'>To approve this deletion, provide them with this 6-digit approval code:</p>" +
-                "<div style='background: #0F172A; border: 1px solid #EF4444; border-radius: 8px; padding: 18px; text-align: center; margin: 16px 0;'>" +
-                "<span style='font-family: monospace; font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #F87171; display: inline-block;'>" + rawCode + "</span>" +
-                "</div>" +
-                "<p style='color: #CBD5E1; font-size: 13px; margin: 16px 0 0 0;'>This code expires in <strong>" + CODE_TTL_MINUTES + " minutes</strong>.</p>" +
-                "<p style='color: #64748B; font-size: 12px; margin: 12px 0 0 0;'>If you did not approve this request, ignore this email and your child's account will remain active.</p>" +
-                "</div></body></html>";
-
-        try {
-            EmailProvider provider = emailProviderFactory.getProvider();
-            provider.sendEmail(parent.getEmail(), subject, bodyHtml, bodyText);
-        } catch (Exception e) {
-            log.error("Failed to send parent deletion approval email to {}: {}", parent.getEmail(), e.getMessage());
+        EmailSendResult result = emailService.sendChildDeletionApprovalEmail(parent, child, rawCode);
+        if (!result.isSuccess()) {
+            log.error("Failed to deliver parent deletion approval email to {}: provider={}, error={}",
+                    maskEmail(parent.getEmail()), result.getProvider(), result.getErrorMessage());
+            throw new IllegalStateException("Failed to send approval code to parent email: " + result.getErrorMessage());
         }
     }
 

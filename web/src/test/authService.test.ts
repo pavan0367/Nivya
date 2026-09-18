@@ -151,6 +151,47 @@ describe('authService & Role Isolation', () => {
     expect(verifyResult.valid).toBe(true);
   });
 
+  it('Resend Code triggers requestChildDeletionApproval and resets 15-minute expiry countdown', async () => {
+    const resendSpy = vi.spyOn(authService, 'requestChildDeletionApproval').mockResolvedValue({
+      success: true,
+      approvalCodeRequired: true,
+      parentEmailMasked: 'pa***@gmail.com',
+      expiresInMinutes: 15,
+      message: 'Approval code sent to your connected parent (pa***@gmail.com).',
+    });
+
+    // Initial request
+    const firstResult = await authService.requestChildDeletionApproval();
+    expect(firstResult.success).toBe(true);
+    expect(firstResult.expiresInMinutes).toBe(15);
+    expect(firstResult.parentEmailMasked).toBe('pa***@gmail.com');
+
+    // Resend request
+    const resendResult = await authService.requestChildDeletionApproval();
+    expect(resendSpy).toHaveBeenCalledTimes(2);
+    expect(resendResult.success).toBe(true);
+    expect(resendResult.expiresInMinutes).toBe(15);
+    expect(resendResult.message).toContain('Approval code sent');
+  });
+
+  it('Failed resend preserves error without reporting false success', async () => {
+    vi.spyOn(authService, 'requestChildDeletionApproval').mockRejectedValue({
+      response: {
+        data: {
+          message: 'Failed to send approval code to parent email: Brevo validation/bad request error (HTTP 400)',
+        },
+      },
+    });
+
+    await expect(authService.requestChildDeletionApproval()).rejects.toMatchObject({
+      response: {
+        data: {
+          message: expect.stringContaining('Failed to send approval code'),
+        },
+      },
+    });
+  });
+
   it('cleans up all authentication tokens and profile data when 401 occurs', () => {
     localStorage.setItem('nivya_access_token', 'expired_jwt');
     localStorage.setItem('nivya_refresh_token', 'expired_refresh');

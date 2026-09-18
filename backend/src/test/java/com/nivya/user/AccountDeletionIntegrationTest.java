@@ -31,6 +31,7 @@ import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -316,5 +317,69 @@ public class AccountDeletionIntegrationTest {
 
         // Disconnected child receives confirmation email
         waitForEmail(email, "Your Nivya Account Permanently Deleted");
+    }
+
+    @Test
+    @DisplayName("Child deletion approval email: dispatches CHILD_DELETION_APPROVAL notification, resend invalidates old code and generates new code")
+    void testChildDeletionApprovalEmailAndResendFlow() throws Exception {
+        String suffix = String.valueOf(System.currentTimeMillis());
+        String parentEmail = "p_resend_" + suffix + "@nivya.local";
+        String childEmail = "c_resend_" + suffix + "@nivya.local";
+        String password = "Password123!";
+
+        AuthResponse pAuth = registerUser("Resend Parent", parentEmail, password, RoleType.PARENT);
+        AuthResponse cAuth = registerUser("Resend Child", childEmail, password, RoleType.CHILD);
+
+        User parent = userRepository.findById(pAuth.getUser().getId()).orElseThrow();
+        User child = userRepository.findById(cAuth.getUser().getId()).orElseThrow();
+
+        Family family = familyRepository.save(new Family("Resend Family", parent));
+        familyMemberRepository.save(new FamilyMember(family, parent, RoleType.PARENT));
+        familyMemberRepository.save(new FamilyMember(family, child, RoleType.CHILD));
+
+        String cToken = cAuth.getAccessToken();
+
+        // 1. Initial approval code dispatch
+        mockMvc.perform(post("/api/v1/account/deletion/request-child-approval")
+                        .header("Authorization", "Bearer " + cToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.expiresInMinutes").value(15))
+                .andExpect(jsonPath("$.data.parentEmailMasked").isNotEmpty());
+
+        // Verify DeletionApprovalCode was generated and is PENDING
+        List<DeletionApprovalCode> codesAfterFirst = approvalCodeRepository.findAllByChildUserIdAndStatus(child.getId(), "PENDING");
+        assertThat(codesAfterFirst).hasSize(1);
+        DeletionApprovalCode firstCode = codesAfterFirst.get(0);
+        assertThat(firstCode.getStatus()).isEqualTo("PENDING");
+
+        // Verify email_notifications entity was persisted with CHILD_DELETION_APPROVAL
+        List<com.nivya.email.entity.EmailNotification> notifs = emailNotificationRepository.findAll();
+        assertThat(notifs).anyMatch(n ->
+                "CHILD_DELETION_APPROVAL".equals(n.getNotificationType()) &&
+                parentEmail.equals(n.getRecipientEmail()) &&
+                "SENT".equals(n.getStatus())
+        );
+
+        // 2. Resend approval code dispatch
+        mockMvc.perform(post("/api/v1/account/deletion/request-child-approval")
+                        .header("Authorization", "Bearer " + cToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.expiresInMinutes").value(15));
+
+        // Verify previous code is now REVOKED and exactly 1 NEW code is PENDING
+        DeletionApprovalCode refreshedFirstCode = approvalCodeRepository.findById(firstCode.getId()).orElseThrow();
+        assertThat(refreshedFirstCode.getStatus()).isEqualTo("REVOKED");
+
+        List<DeletionApprovalCode> codesAfterSecond = approvalCodeRepository.findAllByChildUserIdAndStatus(child.getId(), "PENDING");
+        assertThat(codesAfterSecond).hasSize(1);
+        DeletionApprovalCode secondCode = codesAfterSecond.get(0);
+        assertThat(secondCode.getId()).isNotEqualTo(firstCode.getId());
+        assertThat(secondCode.getStatus()).isEqualTo("PENDING");
+
+        // Verify a second distinct email_notifications record exists
+        long childApprovalEmailCount = emailNotificationRepository.findAll().stream()
+                .filter(n -> "CHILD_DELETION_APPROVAL".equals(n.getNotificationType()) && parentEmail.equals(n.getRecipientEmail()))
+                .count();
+        assertThat(childApprovalEmailCount).isGreaterThanOrEqualTo(2);
     }
 }

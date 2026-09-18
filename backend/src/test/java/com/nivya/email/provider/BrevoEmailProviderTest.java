@@ -295,4 +295,98 @@ public class BrevoEmailProviderTest {
         assertThat(factory.getProvider("SIMULATION")).isSameAs(simProvider);
         assertThat(factory.getProvider("SMTP")).isSameAs(smtpProvider);
     }
+
+    @Test
+    @DisplayName("Default from-email must be the verified Brevo sender breversupport@gmail.com")
+    void testDefaultFromEmailIsVerifiedBrevoSender() {
+        BrevoEmailProvider provider = new BrevoEmailProvider(
+                "xkeysib-test-key", null, "Nivya",
+                "https://api.brevo.com/v3/smtp/email", 5000, objectMapper, mock(HttpClient.class)
+        );
+        assertThat(provider.getFromEmail()).isEqualTo("breversupport@gmail.com");
+
+        BrevoEmailProvider emptyProvider = new BrevoEmailProvider(
+                "xkeysib-test-key", "   ", "Nivya",
+                "https://api.brevo.com/v3/smtp/email", 5000, objectMapper, mock(HttpClient.class)
+        );
+        assertThat(emptyProvider.getFromEmail()).isEqualTo("breversupport@gmail.com");
+    }
+
+    @Test
+    @DisplayName("Child deletion approval email via Brevo: HTTP 201 parses messageId and builds valid Brevo contract")
+    void testChildDeletionApprovalPayloadAndMessageIdExtraction() throws Exception {
+        HttpClient mockClient = mock(HttpClient.class);
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> mockResponse = mock(HttpResponse.class);
+
+        when(mockResponse.statusCode()).thenReturn(201);
+        when(mockResponse.body()).thenReturn("{\"messageId\":\"<child-del-20260918.abcdef@smtp-relay.brevo.com>\"}");
+        doReturn(mockResponse).when(mockClient).send(any(HttpRequest.class), any());
+
+        String apiKey = "xkeysib-real-format-sample-api-key";
+        BrevoEmailProvider provider = new BrevoEmailProvider(
+                apiKey, "breversupport@gmail.com", "Nivya",
+                "https://api.brevo.com/v3/smtp/email", 5000, objectMapper, mockClient
+        );
+
+        String rawCode = "619284";
+        String htmlBody = "<h1>Child Account Deletion Request</h1><p>Code: 619284</p>";
+        String textBody = "Child Account Deletion Request. Code: 619284";
+
+        EmailSendResult result = provider.sendEmail(
+                "parent@example.com",
+                "Nivya - Child Account Deletion Request",
+                htmlBody,
+                textBody
+        );
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getProvider()).isEqualTo("BREVO");
+        assertThat(result.getMessageId()).isEqualTo("<child-del-20260918.abcdef@smtp-relay.brevo.com>");
+
+        ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(mockClient, times(1)).send(requestCaptor.capture(), any());
+
+        HttpRequest request = requestCaptor.getValue();
+        assertThat(request.uri().toString()).isEqualTo("https://api.brevo.com/v3/smtp/email");
+        assertThat(request.headers().firstValue("api-key")).contains(apiKey);
+        assertThat(request.headers().firstValue("Content-Type")).contains("application/json");
+
+        String body = readBody(request);
+        assertThat(body).contains("\"sender\":{\"name\":\"Nivya\",\"email\":\"breversupport@gmail.com\"}");
+        assertThat(body).contains("\"to\":[{\"email\":\"parent@example.com\"}]");
+        assertThat(body).contains("\"subject\":\"Nivya - Child Account Deletion Request\"");
+        assertThat(body).contains("\"htmlContent\":\"" + htmlBody.replace("\"", "\\\"") + "\"");
+        assertThat(body).contains("\"textContent\":\"" + textBody + "\"");
+    }
+
+    @Test
+    @DisplayName("Brevo failure (HTTP 400 sender unverified) returns failure and does not report success")
+    void testBrevoFailureDoesNotReportSuccess() throws Exception {
+        HttpClient mockClient = mock(HttpClient.class);
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> mockResponse = mock(HttpResponse.class);
+
+        when(mockResponse.statusCode()).thenReturn(400);
+        when(mockResponse.body()).thenReturn("{\"code\":\"invalid_parameter\",\"message\":\"sender.email is not a valid email or domain is not verified\"}");
+        doReturn(mockResponse).when(mockClient).send(any(HttpRequest.class), any());
+
+        BrevoEmailProvider provider = new BrevoEmailProvider(
+                "xkeysib-test-key", "noreply@nivya.com", "Nivya",
+                "https://api.brevo.com/v3/smtp/email", 5000, objectMapper, mockClient
+        );
+
+        EmailSendResult result = provider.sendEmail(
+                "parent@example.com",
+                "Nivya - Child Account Deletion Request",
+                "<p>Test</p>",
+                "Test"
+        );
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getProvider()).isEqualTo("BREVO");
+        assertThat(result.getMessageId()).isNull();
+        assertThat(result.getErrorMessage()).contains("HTTP 400");
+        assertThat(result.getErrorMessage()).contains("domain is not verified");
+    }
 }

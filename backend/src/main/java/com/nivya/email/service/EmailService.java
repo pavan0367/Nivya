@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -452,8 +453,38 @@ public class EmailService {
             String idempotencyKey = "parent-notify-child-del-" + childEmail + "-" + System.currentTimeMillis();
             dispatchEmailSync(null, parentEmail, "CHILD_ACCOUNT_DELETED_NOTICE", subject, bodyHtml, bodyText, idempotencyKey);
         } catch (Exception e) {
-            log.error("Failed to send child deletion notice to parent {}: {}", parentEmail, e.getMessage());
+            log.error("Failed to send child deletion notice to parent {}: {}", maskEmail(parentEmail), e.getMessage());
         }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public EmailSendResult sendChildDeletionApprovalEmail(User parent, User child, String rawCode) {
+        String subject = "Nivya - Child Account Deletion Request";
+        String bodyText = "Nivya\nChild Account Deletion Request\n\n" +
+                "Your connected child (" + child.getName() + " - " + child.getEmail() + ") has requested to permanently delete their Nivya account.\n\n" +
+                "To approve this deletion, provide them with this 6-digit approval code:\n" +
+                rawCode + "\n\n" +
+                "This code expires in " + VERIFICATION_TTL_MINUTES + " minutes.\n" +
+                "If you did not approve this request, you can safely ignore this email and the child's account will remain active.";
+
+        String bodyHtml = "<!DOCTYPE html><html><head><meta charset='UTF-8'></head>" +
+                "<body style='font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background-color: #0F172A; color: #F8FAFC; padding: 32px 16px; margin: 0;'>" +
+                "<div style='max-width: 500px; margin: 0 auto; background: #1E293B; border-radius: 12px; border: 1px solid #334155; padding: 32px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);'>" +
+                "<div style='margin-bottom: 20px;'><h1 style='color: #EF4444; margin: 0; font-size: 22px; font-weight: 800;'>Nivya</h1>" +
+                "<h2 style='color: #E2E8F0; margin: 6px 0 0 0; font-size: 17px; font-weight: 600;'>Child Account Deletion Request</h2></div>" +
+                "<p style='color: #94A3B8; font-size: 14px; line-height: 1.5; margin: 16px 0;'>" +
+                "Your connected child <strong style='color: #F8FAFC;'>" + child.getName() + "</strong> (" + child.getEmail() + ") has requested to permanently delete their Nivya account." +
+                "</p>" +
+                "<p style='color: #94A3B8; font-size: 14px; margin: 16px 0 8px 0;'>To approve this deletion, provide them with this 6-digit approval code:</p>" +
+                "<div style='background: #0F172A; border: 1px solid #EF4444; border-radius: 8px; padding: 18px; text-align: center; margin: 16px 0;'>" +
+                "<span style='font-family: monospace; font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #F87171; display: inline-block;'>" + rawCode + "</span>" +
+                "</div>" +
+                "<p style='color: #CBD5E1; font-size: 13px; margin: 16px 0 0 0;'>This code expires in <strong>" + VERIFICATION_TTL_MINUTES + " minutes</strong>.</p>" +
+                "<p style='color: #64748B; font-size: 12px; margin: 12px 0 0 0;'>If you did not approve this request, ignore this email and your child's account will remain active.</p>" +
+                "</div></body></html>";
+
+        String idempotencyKey = "child-del-approval-" + child.getId() + "-" + System.currentTimeMillis();
+        return dispatchEmailSync(parent, parent.getEmail(), "CHILD_DELETION_APPROVAL", subject, bodyHtml, bodyText, idempotencyKey);
     }
 
     // =========================================================================
@@ -490,11 +521,12 @@ public class EmailService {
         dispatchEmailSync(user, recipient, type, subject, bodyHtml, bodyText, idempotencyKey);
     }
 
-    private void dispatchEmailSync(User user, String recipient, String type, String subject,
-                                   String bodyHtml, String bodyText, String idempotencyKey) {
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public EmailSendResult dispatchEmailSync(User user, String recipient, String type, String subject,
+                                             String bodyHtml, String bodyText, String idempotencyKey) {
         if (idempotencyKey != null && notificationRepository.findByIdempotencyKey(idempotencyKey).isPresent()) {
             log.debug("Email with idempotency key {} already processed. Skipping duplicate.", idempotencyKey);
-            return;
+            return EmailSendResult.success("IDEMPOTENT", "already-processed");
         }
 
         EmailProvider provider = providerFactory.getProvider();
@@ -507,34 +539,63 @@ public class EmailService {
         int attempts = 0;
         boolean delivered = false;
         long backoffMs = 500;
+        EmailSendResult lastResult = null;
 
         while (attempts < notification.getMaxAttempts() && !delivered) {
             attempts++;
             try {
                 EmailSendResult result = provider.sendEmail(recipient, subject, bodyHtml, bodyText);
+                lastResult = result;
                 if (result.isSuccess()) {
                     notification.recordSuccess(result.getMessageId());
                     notificationRepository.save(notification);
                     delivered = true;
-                    log.info("Email delivered: id={} to={} type={}", notification.getId(), recipient, type);
+                    log.info("Email delivered: id={} to={} type={}", notification.getId(), maskEmail(recipient), type);
+                    return result;
                 } else {
                     notification.recordFailure(result.getErrorMessage());
                     notificationRepository.save(notification);
-                    Thread.sleep(backoffMs);
-                    backoffMs *= 2;
+                    log.warn("Email attempt {}/{} failed for notification id={} to={} provider={}: {}",
+                            attempts, notification.getMaxAttempts(), notification.getId(), maskEmail(recipient),
+                            provider.getProviderName(), result.getErrorMessage());
+                    if (attempts < notification.getMaxAttempts()) {
+                        Thread.sleep(backoffMs);
+                        backoffMs *= 2;
+                    }
                 }
             } catch (Exception e) {
-                notification.recordFailure(e.getMessage());
+                String sanitizedError = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+                lastResult = EmailSendResult.failure(provider.getProviderName(), sanitizedError);
+                notification.recordFailure(sanitizedError);
                 notificationRepository.save(notification);
+                log.warn("Email attempt {}/{} exception for notification id={} to={}: {}",
+                        attempts, notification.getMaxAttempts(), notification.getId(), maskEmail(recipient), sanitizedError);
                 try {
-                    Thread.sleep(backoffMs);
+                    if (attempts < notification.getMaxAttempts()) {
+                        Thread.sleep(backoffMs);
+                        backoffMs *= 2;
+                    }
                 } catch (InterruptedException ignored) {
                     Thread.currentThread().interrupt();
                     break;
                 }
-                backoffMs *= 2;
             }
         }
+
+        return lastResult != null ? lastResult : EmailSendResult.failure(provider.getProviderName(), "Email delivery failed after max attempts");
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) {
+            return "***";
+        }
+        int atIdx = email.indexOf('@');
+        String namePart = email.substring(0, atIdx);
+        String domainPart = email.substring(atIdx);
+        if (namePart.length() <= 2) {
+            return namePart.charAt(0) + "***" + domainPart;
+        }
+        return namePart.substring(0, 2) + "***" + domainPart;
     }
 
     private EmailPreference getOrCreatePreference(User user) {

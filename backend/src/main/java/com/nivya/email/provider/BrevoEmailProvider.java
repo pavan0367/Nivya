@@ -42,7 +42,7 @@ public class BrevoEmailProvider implements EmailProvider {
     @Autowired
     public BrevoEmailProvider(
             @Value("${nivya.email.brevo.api-key:}") String apiKey,
-            @Value("${nivya.email.brevo.from:${nivya.email.from:breversupport@gmail.com}}") String fromEmail,
+            @Value("${nivya.email.brevo.from:breversupport@gmail.com}") String fromEmail,
             @Value("${nivya.email.brevo.from-name:Nivya}") String fromName,
             @Value("${nivya.email.brevo.api-url:https://api.brevo.com/v3/smtp/email}") String apiUrl,
             @Value("${nivya.email.brevo.timeout-ms:5000}") int timeoutMs,
@@ -87,7 +87,7 @@ public class BrevoEmailProvider implements EmailProvider {
     public EmailSendResult sendEmail(String to, String subject, String bodyHtml, String bodyText) {
         if (!isConfigured()) {
             String guidance = "Brevo API key unconfigured. Set BREVO_API_KEY in environment variables (or set EMAIL_PROVIDER to SIMULATION).";
-            log.warn("Cannot dispatch email via Brevo to {}: {}", to, guidance);
+            log.warn("Cannot dispatch email via Brevo to {}: {}", maskEmail(to), guidance);
             return EmailSendResult.failure(getProviderName(), guidance);
         }
 
@@ -97,7 +97,7 @@ public class BrevoEmailProvider implements EmailProvider {
 
         try {
             log.info("Dispatching email via Brevo HTTPS API to={} from={} ({}) subject='{}'",
-                    to, fromEmail, fromName, subject);
+                    maskEmail(to), fromEmail, fromName, subject);
 
             Map<String, Object> payload = new LinkedHashMap<>();
 
@@ -134,28 +134,41 @@ public class BrevoEmailProvider implements EmailProvider {
 
             if (statusCode >= 200 && statusCode < 300) {
                 String messageId = parseMessageId(response.body());
-                log.info("Successfully delivered Brevo email messageId={} to={}", messageId, to);
+                log.info("Successfully delivered Brevo email messageId={} to={}", messageId, maskEmail(to));
                 return EmailSendResult.success(getProviderName(), messageId);
             } else {
                 String errorMessage = parseErrorMessage(statusCode, response.body());
-                log.error("Brevo API rejected email delivery to {} with HTTP {}: {}", to, statusCode, errorMessage);
+                log.error("Brevo API rejected email delivery to {} with HTTP {}: {}", maskEmail(to), statusCode, errorMessage);
                 return EmailSendResult.failure(getProviderName(), errorMessage);
             }
 
         } catch (HttpTimeoutException e) {
             String timeoutMsg = "Brevo API network timeout after " + timeoutMs + "ms: " + e.getMessage();
-            log.error("Failed to deliver Brevo email to {}: {}", to, timeoutMsg);
+            log.error("Failed to deliver Brevo email to {}: {}", maskEmail(to), timeoutMsg);
             return EmailSendResult.failure(getProviderName(), timeoutMsg);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             String interruptedMsg = "Brevo API dispatch interrupted: " + e.getMessage();
-            log.error("Failed to deliver Brevo email to {}: {}", to, interruptedMsg);
+            log.error("Failed to deliver Brevo email to {}: {}", maskEmail(to), interruptedMsg);
             return EmailSendResult.failure(getProviderName(), interruptedMsg);
         } catch (Exception e) {
             String genericError = "Brevo delivery failed: " + e.getMessage();
-            log.error("Failed to dispatch email via Brevo to {}: {}", to, genericError);
+            log.error("Failed to dispatch email via Brevo to {}: {}", maskEmail(to), genericError);
             return EmailSendResult.failure(getProviderName(), genericError);
         }
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) {
+            return "***";
+        }
+        int atIdx = email.indexOf('@');
+        String namePart = email.substring(0, atIdx);
+        String domainPart = email.substring(atIdx);
+        if (namePart.length() <= 2) {
+            return namePart.charAt(0) + "***" + domainPart;
+        }
+        return namePart.substring(0, 2) + "***" + domainPart;
     }
 
     private String parseMessageId(String responseBody) {
