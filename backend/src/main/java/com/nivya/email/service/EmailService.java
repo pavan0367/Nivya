@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -64,6 +65,7 @@ public class EmailService {
         this.userRepository = userRepository;
         this.auditService = auditService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     // =========================================================================
@@ -555,7 +557,9 @@ public class EmailService {
         EmailProvider provider = providerFactory.getProvider();
 
         // PHASE 1: SHORT TRANSACTION - Idempotency check & create initial PENDING notification record
-        Long notificationId = transactionTemplate.execute(status -> {
+        record DispatchContext(Long notificationId, String finalSubject) {}
+
+        DispatchContext ctx = transactionTemplate.execute(status -> {
             if (idempotencyKey != null && notificationRepository.findByIdempotencyKey(idempotencyKey).isPresent()) {
                 log.debug("Email with idempotency key {} already processed. Skipping duplicate.", idempotencyKey);
                 return null;
@@ -570,12 +574,22 @@ public class EmailService {
             EmailNotification notification = new EmailNotification(
                     attachedUser, recipient, type, subject, provider.getProviderName(), idempotencyKey
             );
-            notification = notificationRepository.save(notification);
-            return notification.getId();
+            notification = notificationRepository.saveAndFlush(notification);
+
+            // Append short unique reference #<id> to prevent Gmail threading
+            String baseSubject = (subject != null) ? subject : "";
+            Long notifId = notification.getId();
+            String finalSubject = (notifId != null && !baseSubject.contains(" #" + notifId))
+                    ? baseSubject + " #" + notifId
+                    : baseSubject;
+            notification.setSubject(finalSubject);
+            notification = notificationRepository.saveAndFlush(notification);
+
+            return new DispatchContext(notification.getId(), finalSubject);
         });
 
         // Idempotency duplicate detected: return existing success without re-sending
-        if (notificationId == null) {
+        if (ctx == null) {
             return EmailSendResult.success("IDEMPOTENT", "already-processed");
         }
 
@@ -589,15 +603,15 @@ public class EmailService {
         while (attempts < maxAttempts && !delivered) {
             attempts++;
             try {
-                EmailSendResult result = provider.sendEmail(recipient, subject, bodyHtml, bodyText);
+                EmailSendResult result = provider.sendEmail(recipient, ctx.finalSubject(), bodyHtml, bodyText);
                 lastResult = result;
                 if (result.isSuccess()) {
                     delivered = true;
-                    log.info("Email delivered: id={} to={} type={}", notificationId, maskEmail(recipient), type);
+                    log.info("Email delivered: id={} to={} type={}", ctx.notificationId(), maskEmail(recipient), type);
                     break;
                 } else {
                     log.warn("Email attempt {}/{} failed for notification id={} to={} provider={}: {}",
-                            attempts, maxAttempts, notificationId, maskEmail(recipient),
+                            attempts, maxAttempts, ctx.notificationId(), maskEmail(recipient),
                             provider.getProviderName(), result.getErrorMessage());
                     if (attempts < maxAttempts) {
                         Thread.sleep(backoffMs);
@@ -608,7 +622,7 @@ public class EmailService {
                 String sanitizedError = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
                 lastResult = EmailSendResult.failure(provider.getProviderName(), sanitizedError);
                 log.warn("Email attempt {}/{} exception for notification id={} to={}: {}",
-                        attempts, maxAttempts, notificationId, maskEmail(recipient), sanitizedError);
+                        attempts, maxAttempts, ctx.notificationId(), maskEmail(recipient), sanitizedError);
                 try {
                     if (attempts < maxAttempts) {
                         Thread.sleep(backoffMs);
@@ -627,20 +641,22 @@ public class EmailService {
         final boolean wasDelivered = delivered;
 
         // PHASE 3: SHORT TRANSACTION - Update final delivery status (SENT or FAILED)
-        transactionTemplate.executeWithoutResult(status -> {
-            Optional<EmailNotification> notifOpt = notificationRepository.findById(notificationId);
-            if (notifOpt.isPresent()) {
-                EmailNotification notif = notifOpt.get();
-                notif.setAttemptCount(finalAttempts);
-                if (wasDelivered && finalResult.isSuccess()) {
-                    notif.recordSuccess(finalResult.getMessageId());
-                } else {
-                    notif.setStatus("FAILED");
-                    notif.setFailureReason(finalResult.getErrorMessage());
+        if (ctx.notificationId() != null) {
+            transactionTemplate.executeWithoutResult(status -> {
+                Optional<EmailNotification> notifOpt = notificationRepository.findById(ctx.notificationId());
+                if (notifOpt.isPresent()) {
+                    EmailNotification notif = notifOpt.get();
+                    notif.setAttemptCount(finalAttempts);
+                    if (wasDelivered && finalResult.isSuccess()) {
+                        notif.recordSuccess(finalResult.getMessageId());
+                    } else {
+                        notif.setStatus("FAILED");
+                        notif.setFailureReason(finalResult.getErrorMessage());
+                    }
+                    notificationRepository.save(notif);
                 }
-                notificationRepository.save(notif);
-            }
-        });
+            });
+        }
 
         return finalResult;
     }
