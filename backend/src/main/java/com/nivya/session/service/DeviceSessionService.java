@@ -76,11 +76,26 @@ public class DeviceSessionService {
                 "Session created on " + (platform != null ? platform : "UNKNOWN") + " (" + (deviceName != null ? deviceName : "Device") + ")",
                 ipAddress);
 
-        // Dispatches asynchronously without blocking login
-        if (isNewDevice) {
-            emailService.sendNewDeviceLoginNotificationAsync(user, deviceName, platform, osVersion, appVersion, ipAddress, approxLocation);
+        // Dispatches asynchronously without blocking login, strictly after transaction commits
+        Runnable dispatchLoginAlerts = () -> {
+            if (isNewDevice) {
+                emailService.sendNewDeviceLoginNotificationAsync(user, deviceName, platform, osVersion, appVersion, ipAddress, approxLocation);
+            }
+            emailService.sendLoginNotificationAsync(user, deviceName, platform, osVersion, appVersion, ipAddress, approxLocation);
+        };
+
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            dispatchLoginAlerts.run();
+                        }
+                    }
+            );
+        } else {
+            dispatchLoginAlerts.run();
         }
-        emailService.sendLoginNotificationAsync(user, deviceName, platform, osVersion, appVersion, ipAddress, approxLocation);
 
         return session;
     }
@@ -97,8 +112,20 @@ public class DeviceSessionService {
                     });
         }
 
-        // Send non-blocking logout email
-        emailService.sendLogoutNotificationAsync(user, ipAddress);
+        // Send non-blocking logout email strictly after transaction commits
+        Runnable dispatchLogout = () -> emailService.sendLogoutNotificationAsync(user, ipAddress);
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            dispatchLogout.run();
+                        }
+                    }
+            );
+        } else {
+            dispatchLogout.run();
+        }
     }
 
     @Transactional(readOnly = true)

@@ -15,8 +15,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -43,6 +47,7 @@ public class EmailService {
     private final EmailVerificationCodeRepository verificationCodeRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
+    private final TransactionTemplate transactionTemplate;
 
     public EmailService(
             EmailProviderFactory providerFactory,
@@ -50,13 +55,15 @@ public class EmailService {
             EmailPreferenceRepository preferenceRepository,
             EmailVerificationCodeRepository verificationCodeRepository,
             UserRepository userRepository,
-            AuditService auditService) {
+            AuditService auditService,
+            PlatformTransactionManager transactionManager) {
         this.providerFactory = providerFactory;
         this.notificationRepository = notificationRepository;
         this.preferenceRepository = preferenceRepository;
         this.verificationCodeRepository = verificationCodeRepository;
         this.userRepository = userRepository;
         this.auditService = auditService;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     // =========================================================================
@@ -68,9 +75,7 @@ public class EmailService {
         String normalizedEmail = email.toLowerCase().trim();
 
         // If user not provided (e.g. unauthenticated resend), associate existing account if registered
-        if (user == null) {
-            user = userRepository.findByEmail(normalizedEmail).orElse(null);
-        }
+        User targetUser = (user != null) ? user : userRepository.findByEmail(normalizedEmail).orElse(null);
 
         // Invalidate previous active unused codes for this email and purpose so they cannot be reused
         List<EmailVerificationCode> existingCodes = verificationCodeRepository
@@ -90,10 +95,10 @@ public class EmailService {
         String codeHash = sha256(plaintextCode);
         Instant expiresAt = Instant.now().plus(Duration.ofMinutes(VERIFICATION_TTL_MINUTES));
 
-        EmailVerificationCode verificationCode = new EmailVerificationCode(user, normalizedEmail, codeHash, purpose, expiresAt);
+        EmailVerificationCode verificationCode = new EmailVerificationCode(targetUser, normalizedEmail, codeHash, purpose, expiresAt);
         verificationCodeRepository.save(verificationCode);
 
-        auditService.logEvent(user != null ? user.getId() : null, "EMAIL_VERIFICATION_CODE_GENERATED",
+        auditService.logEvent(targetUser != null ? targetUser.getId() : null, "EMAIL_VERIFICATION_CODE_GENERATED",
                 "Verification code generated for " + normalizedEmail + " (" + purpose + ")", "SYSTEM");
 
         // 3. Dispatch email asynchronously (NEVER log the plaintext code)
@@ -114,7 +119,17 @@ public class EmailService {
                 "</div></body></html>";
 
         String idempotencyKey = "verify-" + normalizedEmail + "-" + System.currentTimeMillis();
-        dispatchEmailAsync(user, normalizedEmail, "VERIFICATION", subject, bodyHtml, bodyText, idempotencyKey);
+        Runnable emailTask = () -> dispatchEmailAsync(targetUser, normalizedEmail, "VERIFICATION", subject, bodyHtml, bodyText, idempotencyKey);
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    emailTask.run();
+                }
+            });
+        } else {
+            emailTask.run();
+        }
     }
 
     @Transactional
@@ -457,11 +472,10 @@ public class EmailService {
         }
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public EmailSendResult sendChildDeletionApprovalEmail(User parent, User child, String rawCode) {
+    public EmailSendResult sendChildDeletionApprovalEmail(Long parentUserId, String parentEmail, Long childUserId, String childName, String childEmail, String rawCode) {
         String subject = "Nivya - Child Account Deletion Request";
         String bodyText = "Nivya\nChild Account Deletion Request\n\n" +
-                "Your connected child (" + child.getName() + " - " + child.getEmail() + ") has requested to permanently delete their Nivya account.\n\n" +
+                "Your connected child (" + (childName != null ? childName : "Child") + " - " + (childEmail != null ? childEmail : "") + ") has requested to permanently delete their Nivya account.\n\n" +
                 "To approve this deletion, provide them with this 6-digit approval code:\n" +
                 rawCode + "\n\n" +
                 "This code expires in " + VERIFICATION_TTL_MINUTES + " minutes.\n" +
@@ -473,7 +487,7 @@ public class EmailService {
                 "<div style='margin-bottom: 20px;'><h1 style='color: #EF4444; margin: 0; font-size: 22px; font-weight: 800;'>Nivya</h1>" +
                 "<h2 style='color: #E2E8F0; margin: 6px 0 0 0; font-size: 17px; font-weight: 600;'>Child Account Deletion Request</h2></div>" +
                 "<p style='color: #94A3B8; font-size: 14px; line-height: 1.5; margin: 16px 0;'>" +
-                "Your connected child <strong style='color: #F8FAFC;'>" + child.getName() + "</strong> (" + child.getEmail() + ") has requested to permanently delete their Nivya account." +
+                "Your connected child <strong style='color: #F8FAFC;'>" + (childName != null ? childName : "Child") + "</strong> (" + (childEmail != null ? childEmail : "") + ") has requested to permanently delete their Nivya account." +
                 "</p>" +
                 "<p style='color: #94A3B8; font-size: 14px; margin: 16px 0 8px 0;'>To approve this deletion, provide them with this 6-digit approval code:</p>" +
                 "<div style='background: #0F172A; border: 1px solid #EF4444; border-radius: 8px; padding: 18px; text-align: center; margin: 16px 0;'>" +
@@ -483,8 +497,17 @@ public class EmailService {
                 "<p style='color: #64748B; font-size: 12px; margin: 12px 0 0 0;'>If you did not approve this request, ignore this email and your child's account will remain active.</p>" +
                 "</div></body></html>";
 
-        String idempotencyKey = "child-del-approval-" + child.getId() + "-" + System.currentTimeMillis();
-        return dispatchEmailSync(parent, parent.getEmail(), "CHILD_DELETION_APPROVAL", subject, bodyHtml, bodyText, idempotencyKey);
+        String idempotencyKey = "child-del-approval-" + (childUserId != null ? childUserId : 0) + "-" + System.currentTimeMillis();
+        return dispatchEmailByIdSync(parentUserId, parentEmail, "CHILD_DELETION_APPROVAL", subject, bodyHtml, bodyText, idempotencyKey);
+    }
+
+    public EmailSendResult sendChildDeletionApprovalEmail(User parent, User child, String rawCode) {
+        Long parentId = parent != null ? parent.getId() : null;
+        String parentEmail = parent != null ? parent.getEmail() : null;
+        Long childId = child != null ? child.getId() : null;
+        String childName = child != null ? child.getName() : "Child";
+        String childEmail = child != null ? child.getEmail() : "";
+        return sendChildDeletionApprovalEmail(parentId, parentEmail, childId, childName, childEmail, rawCode);
     }
 
     // =========================================================================
@@ -521,44 +544,62 @@ public class EmailService {
         dispatchEmailSync(user, recipient, type, subject, bodyHtml, bodyText, idempotencyKey);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public EmailSendResult dispatchEmailSync(User user, String recipient, String type, String subject,
                                              String bodyHtml, String bodyText, String idempotencyKey) {
-        if (idempotencyKey != null && notificationRepository.findByIdempotencyKey(idempotencyKey).isPresent()) {
-            log.debug("Email with idempotency key {} already processed. Skipping duplicate.", idempotencyKey);
+        Long userId = (user != null) ? user.getId() : null;
+        return dispatchEmailByIdSync(userId, recipient, type, subject, bodyHtml, bodyText, idempotencyKey);
+    }
+
+    public EmailSendResult dispatchEmailByIdSync(Long userId, String recipient, String type, String subject,
+                                                 String bodyHtml, String bodyText, String idempotencyKey) {
+        EmailProvider provider = providerFactory.getProvider();
+
+        // PHASE 1: SHORT TRANSACTION - Idempotency check & create initial PENDING notification record
+        Long notificationId = transactionTemplate.execute(status -> {
+            if (idempotencyKey != null && notificationRepository.findByIdempotencyKey(idempotencyKey).isPresent()) {
+                log.debug("Email with idempotency key {} already processed. Skipping duplicate.", idempotencyKey);
+                return null;
+            }
+
+            // Look up User entity cleanly within this short transaction context
+            User attachedUser = null;
+            if (userId != null) {
+                attachedUser = userRepository.findById(userId).orElse(null);
+            }
+
+            EmailNotification notification = new EmailNotification(
+                    attachedUser, recipient, type, subject, provider.getProviderName(), idempotencyKey
+            );
+            notification = notificationRepository.save(notification);
+            return notification.getId();
+        });
+
+        // Idempotency duplicate detected: return existing success without re-sending
+        if (notificationId == null) {
             return EmailSendResult.success("IDEMPOTENT", "already-processed");
         }
 
-        EmailProvider provider = providerFactory.getProvider();
-        EmailNotification notification = new EmailNotification(
-                user, recipient, type, subject, provider.getProviderName(), idempotencyKey
-        );
-        notification = notificationRepository.save(notification);
-
-        // Exponential backoff retry loop (max 3 attempts)
+        // PHASE 2: NO TRANSACTION - External HTTP call and retry/backoff loop completely outside DB transactions
         int attempts = 0;
         boolean delivered = false;
         long backoffMs = 500;
         EmailSendResult lastResult = null;
+        int maxAttempts = 3;
 
-        while (attempts < notification.getMaxAttempts() && !delivered) {
+        while (attempts < maxAttempts && !delivered) {
             attempts++;
             try {
                 EmailSendResult result = provider.sendEmail(recipient, subject, bodyHtml, bodyText);
                 lastResult = result;
                 if (result.isSuccess()) {
-                    notification.recordSuccess(result.getMessageId());
-                    notificationRepository.save(notification);
                     delivered = true;
-                    log.info("Email delivered: id={} to={} type={}", notification.getId(), maskEmail(recipient), type);
-                    return result;
+                    log.info("Email delivered: id={} to={} type={}", notificationId, maskEmail(recipient), type);
+                    break;
                 } else {
-                    notification.recordFailure(result.getErrorMessage());
-                    notificationRepository.save(notification);
                     log.warn("Email attempt {}/{} failed for notification id={} to={} provider={}: {}",
-                            attempts, notification.getMaxAttempts(), notification.getId(), maskEmail(recipient),
+                            attempts, maxAttempts, notificationId, maskEmail(recipient),
                             provider.getProviderName(), result.getErrorMessage());
-                    if (attempts < notification.getMaxAttempts()) {
+                    if (attempts < maxAttempts) {
                         Thread.sleep(backoffMs);
                         backoffMs *= 2;
                     }
@@ -566,12 +607,10 @@ public class EmailService {
             } catch (Exception e) {
                 String sanitizedError = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
                 lastResult = EmailSendResult.failure(provider.getProviderName(), sanitizedError);
-                notification.recordFailure(sanitizedError);
-                notificationRepository.save(notification);
                 log.warn("Email attempt {}/{} exception for notification id={} to={}: {}",
-                        attempts, notification.getMaxAttempts(), notification.getId(), maskEmail(recipient), sanitizedError);
+                        attempts, maxAttempts, notificationId, maskEmail(recipient), sanitizedError);
                 try {
-                    if (attempts < notification.getMaxAttempts()) {
+                    if (attempts < maxAttempts) {
                         Thread.sleep(backoffMs);
                         backoffMs *= 2;
                     }
@@ -582,7 +621,28 @@ public class EmailService {
             }
         }
 
-        return lastResult != null ? lastResult : EmailSendResult.failure(provider.getProviderName(), "Email delivery failed after max attempts");
+        final int finalAttempts = attempts;
+        final EmailSendResult finalResult = (lastResult != null) ? lastResult :
+                EmailSendResult.failure(provider.getProviderName(), "Email delivery failed after max attempts");
+        final boolean wasDelivered = delivered;
+
+        // PHASE 3: SHORT TRANSACTION - Update final delivery status (SENT or FAILED)
+        transactionTemplate.executeWithoutResult(status -> {
+            Optional<EmailNotification> notifOpt = notificationRepository.findById(notificationId);
+            if (notifOpt.isPresent()) {
+                EmailNotification notif = notifOpt.get();
+                notif.setAttemptCount(finalAttempts);
+                if (wasDelivered && finalResult.isSuccess()) {
+                    notif.recordSuccess(finalResult.getMessageId());
+                } else {
+                    notif.setStatus("FAILED");
+                    notif.setFailureReason(finalResult.getErrorMessage());
+                }
+                notificationRepository.save(notif);
+            }
+        });
+
+        return finalResult;
     }
 
     private String maskEmail(String email) {
@@ -600,7 +660,14 @@ public class EmailService {
 
     private EmailPreference getOrCreatePreference(User user) {
         return preferenceRepository.findByUserId(user.getId())
-                .orElseGet(() -> preferenceRepository.save(new EmailPreference(user)));
+                .orElseGet(() -> {
+                    try {
+                        return preferenceRepository.save(new EmailPreference(user));
+                    } catch (Exception e) {
+                        return preferenceRepository.findByUserId(user.getId())
+                                .orElseGet(() -> new EmailPreference(user));
+                    }
+                });
     }
 
     private String sha256(String input) {

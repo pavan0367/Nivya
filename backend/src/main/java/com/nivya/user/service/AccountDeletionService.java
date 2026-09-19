@@ -23,7 +23,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -57,6 +59,7 @@ public class AccountDeletionService {
     private final EmailProviderFactory emailProviderFactory;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
+    private final TransactionTemplate transactionTemplate;
 
     public AccountDeletionService(
             UserRepository userRepository,
@@ -74,7 +77,8 @@ public class AccountDeletionService {
             com.nivya.email.service.EmailService emailService,
             EmailProviderFactory emailProviderFactory,
             PasswordEncoder passwordEncoder,
-            AuditService auditService) {
+            AuditService auditService,
+            PlatformTransactionManager transactionManager) {
         this.userRepository = userRepository;
         this.familyRepository = familyRepository;
         this.familyMemberRepository = familyMemberRepository;
@@ -91,6 +95,7 @@ public class AccountDeletionService {
         this.emailProviderFactory = emailProviderFactory;
         this.passwordEncoder = passwordEncoder;
         this.auditService = auditService;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     @Transactional(readOnly = true)
@@ -128,40 +133,89 @@ public class AccountDeletionService {
         }
     }
 
-    @Transactional
     public RequestChildApprovalResponse requestChildDeletionApproval(User child) {
         if (child.getRole() != RoleType.CHILD) {
             throw new IllegalArgumentException("Only child accounts can request parent deletion approval.");
         }
 
-        User parent = findConnectedParent(child.getId())
-                .orElseThrow(() -> new IllegalStateException("Child account is not connected to a parent. Cannot request parent approval."));
+        // 1. Short transaction to find parent, revoke previous codes, generate new code, and log audit event
+        record ChildApprovalContext(
+                Long codeRecordId,
+                String rawCode,
+                Long parentId,
+                String parentEmail,
+                Long childId,
+                String childName,
+                String childEmail
+        ) {}
 
-        // Invalidate any previously pending codes for this child
-        List<DeletionApprovalCode> pendingCodes = approvalCodeRepository.findAllByChildUserIdAndStatus(child.getId(), "PENDING");
-        for (DeletionApprovalCode oldCode : pendingCodes) {
-            oldCode.revoke();
+        ChildApprovalContext ctx = transactionTemplate.execute(status -> {
+            User parent = findConnectedParent(child.getId())
+                    .orElseThrow(() -> new IllegalStateException("Child account is not connected to a parent. Cannot request parent approval."));
+
+            User childUser = userRepository.findById(child.getId()).orElse(child);
+
+            // Invalidate any previously pending codes for this child
+            List<DeletionApprovalCode> pendingCodes = approvalCodeRepository.findAllByChildUserIdAndStatus(child.getId(), "PENDING");
+            for (DeletionApprovalCode oldCode : pendingCodes) {
+                oldCode.revoke();
+            }
+            if (!pendingCodes.isEmpty()) {
+                approvalCodeRepository.saveAll(pendingCodes);
+            }
+
+            // Generate 6-digit cryptographically secure code
+            int codeInt = 100000 + RANDOM.nextInt(900000);
+            String rawCode = String.valueOf(codeInt);
+            String codeHash = sha256(rawCode);
+            Instant expiresAt = Instant.now().plus(Duration.ofMinutes(CODE_TTL_MINUTES));
+
+            DeletionApprovalCode codeRecord = new DeletionApprovalCode(child.getId(), parent.getId(), codeHash, expiresAt);
+            codeRecord = approvalCodeRepository.save(codeRecord);
+
+            auditService.logEvent(child.getId(), "CHILD_DELETION_APPROVAL_REQUESTED",
+                    "Child requested account deletion approval. Code dispatched to parent.", "SYSTEM");
+
+            return new ChildApprovalContext(
+                    codeRecord.getId(),
+                    rawCode,
+                    parent.getId(),
+                    parent.getEmail(),
+                    childUser.getId(),
+                    childUser.getName(),
+                    childUser.getEmail()
+            );
+        });
+
+        if (ctx == null) {
+            throw new IllegalStateException("Failed to generate deletion approval code.");
         }
-        if (!pendingCodes.isEmpty()) {
-            approvalCodeRepository.saveAll(pendingCodes);
+
+        // 2. Transaction is now committed. All locks on deletion_approval_codes and users are released.
+        // 3. ONLY AFTER COMMIT: Dispatch notification email to connected parent
+        try {
+            EmailSendResult result = emailService.sendChildDeletionApprovalEmail(
+                    ctx.parentId(), ctx.parentEmail(), ctx.childId(), ctx.childName(), ctx.childEmail(), ctx.rawCode()
+            );
+            if (!result.isSuccess()) {
+                log.error("Failed to deliver parent deletion approval email to {}: provider={}, error={}",
+                        maskEmail(ctx.parentEmail()), result.getProvider(), result.getErrorMessage());
+                throw new IllegalStateException("Failed to send approval code to parent email: " + result.getErrorMessage());
+            }
+        } catch (Exception e) {
+            // Email delivery failed: revoke newly generated code in a separate short transaction
+            transactionTemplate.executeWithoutResult(status -> {
+                approvalCodeRepository.findById(ctx.codeRecordId()).ifPresent(code -> {
+                    code.revoke();
+                    approvalCodeRepository.save(code);
+                });
+                auditService.logEvent(child.getId(), "CHILD_DELETION_EMAIL_FAILED",
+                        "Failed to send parent approval email. Code revoked.", "SYSTEM");
+            });
+            throw e;
         }
 
-        // Generate 6-digit cryptographically secure code
-        int codeInt = 100000 + RANDOM.nextInt(900000);
-        String rawCode = String.valueOf(codeInt);
-        String codeHash = sha256(rawCode);
-        Instant expiresAt = Instant.now().plus(Duration.ofMinutes(CODE_TTL_MINUTES));
-
-        DeletionApprovalCode codeRecord = new DeletionApprovalCode(child.getId(), parent.getId(), codeHash, expiresAt);
-        approvalCodeRepository.save(codeRecord);
-
-        auditService.logEvent(child.getId(), "CHILD_DELETION_APPROVAL_REQUESTED",
-                "Child requested account deletion approval. Code dispatched to parent.", "SYSTEM");
-
-        // Send notification email to connected parent
-        dispatchParentApprovalEmail(parent, child, rawCode);
-
-        String maskedEmail = maskEmail(parent.getEmail());
+        String maskedEmail = maskEmail(ctx.parentEmail());
         return new RequestChildApprovalResponse(
                 "Approval code sent to your connected parent (" + maskedEmail + ").",
                 maskedEmail,
@@ -396,7 +450,7 @@ public class AccountDeletionService {
 
         for (FamilyMember member : members) {
             if (member.getMemberRole() == RoleType.PARENT && !member.getUser().getId().equals(childUserId)) {
-                return Optional.of(member.getUser());
+                return userRepository.findById(member.getUser().getId());
             }
         }
         return Optional.empty();
