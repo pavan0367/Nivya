@@ -439,4 +439,76 @@ public class AccountDeletionIntegrationTest {
                         .content(objectMapper.writeValueAsString(delReq)))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    @DisplayName("verify-child-code verifies valid code and rejects invalid, expired, revoked, and used codes")
+    void testVerifyChildCodeContractAndStates() throws Exception {
+        long ts = System.currentTimeMillis();
+        String pEmail = "parent_v_" + ts + "@nivya.local";
+        String cEmail = "child_v_" + ts + "@nivya.local";
+
+        AuthResponse pAuth = registerUser("Parent V", pEmail, "Password123!", RoleType.PARENT);
+        AuthResponse cAuth = registerUser("Child V", cEmail, "Password123!", RoleType.CHILD);
+
+        User parent = userRepository.findById(pAuth.getUser().getId()).orElseThrow();
+        User child = userRepository.findById(cAuth.getUser().getId()).orElseThrow();
+
+        Family family = familyRepository.save(new Family("Family V " + ts, parent));
+        familyMemberRepository.save(new FamilyMember(family, parent, RoleType.PARENT));
+        familyMemberRepository.save(new FamilyMember(family, child, RoleType.CHILD));
+
+        String cToken = cAuth.getAccessToken();
+
+        // 1. Setup valid PENDING code
+        String testCode = "123456";
+        DeletionApprovalCode codeRecord = new DeletionApprovalCode(
+                child.getId(), parent.getId(), sha256(testCode), java.time.Instant.now().plus(java.time.Duration.ofMinutes(15))
+        );
+        codeRecord.setStatus("PENDING");
+        codeRecord = approvalCodeRepository.save(codeRecord);
+
+        // A. Valid code succeeds with canonical {"code":"123456"} payload
+        mockMvc.perform(post("/api/v1/account/deletion/verify-child-code")
+                        .header("Authorization", "Bearer " + cToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"" + testCode + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.approved").value(true));
+
+        // B. Invalid code fails
+        mockMvc.perform(post("/api/v1/account/deletion/verify-child-code")
+                        .header("Authorization", "Bearer " + cToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"000000\"}"))
+                .andExpect(status().isBadRequest());
+
+        // C. Expired code fails
+        codeRecord.setExpiresAt(java.time.Instant.now().minusSeconds(10));
+        approvalCodeRepository.save(codeRecord);
+        mockMvc.perform(post("/api/v1/account/deletion/verify-child-code")
+                        .header("Authorization", "Bearer " + cToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"" + testCode + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        // D. REVOKED code fails
+        codeRecord.setExpiresAt(java.time.Instant.now().plus(java.time.Duration.ofMinutes(15)));
+        codeRecord.setStatus("REVOKED");
+        approvalCodeRepository.save(codeRecord);
+        mockMvc.perform(post("/api/v1/account/deletion/verify-child-code")
+                        .header("Authorization", "Bearer " + cToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"" + testCode + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        // E. USED code fails
+        codeRecord.setStatus("PENDING");
+        codeRecord.markUsed();
+        approvalCodeRepository.save(codeRecord);
+        mockMvc.perform(post("/api/v1/account/deletion/verify-child-code")
+                        .header("Authorization", "Bearer " + cToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"" + testCode + "\"}"))
+                .andExpect(status().isBadRequest());
+    }
 }

@@ -233,7 +233,7 @@ export const authService = {
     valid: boolean;
     message: string;
   }> {
-    const response = await apiClient.post('/account/deletion/verify-child-code', { approvalCode });
+    const response = await apiClient.post('/account/deletion/verify-child-code', { code: approvalCode });
     return response.data.data;
   },
 

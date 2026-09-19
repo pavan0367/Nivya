@@ -244,6 +244,7 @@ export const SettingsPage: React.FC = () => {
   };
 
   const handleVerifyChildCode = async () => {
+    if (verifyingCode) return;
     if (!childApprovalCode || childApprovalCode.trim().length !== 6) {
       setDeletionError('Please enter a valid 6-digit approval code.');
       return;

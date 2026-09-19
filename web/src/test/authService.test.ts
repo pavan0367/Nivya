@@ -390,4 +390,29 @@ describe('authService & Role Isolation', () => {
       expect(getStatusSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe('Child Deletion Code Verification Contract', () => {
+    it('sends canonical { code: "123456" } payload without approvalCode property', async () => {
+      const postSpy = vi.spyOn(apiClient, 'post').mockResolvedValueOnce({
+        data: {
+          data: {
+            valid: true,
+            message: 'Approval code verified successfully',
+          },
+        },
+      });
+
+      const res = await authService.verifyChildDeletionCode('123456');
+
+      expect(postSpy).toHaveBeenCalledWith(
+        '/account/deletion/verify-child-code',
+        { code: '123456' }
+      );
+      // Explicitly verify approvalCode is NOT present in the payload
+      const calledPayload = postSpy.mock.calls[0][1];
+      expect(calledPayload).toEqual({ code: '123456' });
+      expect(calledPayload).not.toHaveProperty('approvalCode');
+      expect(res.valid).toBe(true);
+    });
+  });
 });
