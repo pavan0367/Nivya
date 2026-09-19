@@ -231,10 +231,17 @@ export const authService = {
 
   async verifyChildDeletionCode(approvalCode: string): Promise<{
     valid: boolean;
-    message: string;
+    approved?: boolean;
+    message?: string;
   }> {
     const response = await apiClient.post('/account/deletion/verify-child-code', { code: approvalCode });
-    return response.data.data;
+    const data = response.data?.data;
+    const isApproved = data?.approved === true || data?.valid === true;
+    return {
+      valid: isApproved,
+      approved: isApproved,
+      message: response.data?.message,
+    };
   },
 
   async deleteAccount(password?: string, approvalCode?: string): Promise<void> {

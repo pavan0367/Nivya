@@ -142,6 +142,7 @@ describe('authService & Role Isolation', () => {
 
     vi.spyOn(authService, 'verifyChildDeletionCode').mockResolvedValue({
       valid: true,
+      approved: true,
       message: 'Code verified',
     });
 
@@ -392,12 +393,13 @@ describe('authService & Role Isolation', () => {
   });
 
   describe('Child Deletion Code Verification Contract', () => {
-    it('sends canonical { code: "123456" } payload without approvalCode property', async () => {
+    it('sends canonical { code: "123456" } payload without approvalCode property and normalizes approved: true to valid: true', async () => {
       const postSpy = vi.spyOn(apiClient, 'post').mockResolvedValueOnce({
         data: {
+          success: true,
+          message: 'Approval code verified successfully',
           data: {
-            valid: true,
-            message: 'Approval code verified successfully',
+            approved: true,
           },
         },
       });
@@ -412,7 +414,28 @@ describe('authService & Role Isolation', () => {
       const calledPayload = postSpy.mock.calls[0][1];
       expect(calledPayload).toEqual({ code: '123456' });
       expect(calledPayload).not.toHaveProperty('approvalCode');
+
+      // Verify normalization from backend approved: true to frontend valid: true and approved: true
       expect(res.valid).toBe(true);
+      expect(res.approved).toBe(true);
+      expect(res.message).toBe('Approval code verified successfully');
+    });
+
+    it('normalizes unapproved response to valid: false and approved: false', async () => {
+      vi.spyOn(apiClient, 'post').mockResolvedValueOnce({
+        data: {
+          success: false,
+          message: 'Invalid code',
+          data: {
+            approved: false,
+          },
+        },
+      });
+
+      const res = await authService.verifyChildDeletionCode('000000');
+      expect(res.valid).toBe(false);
+      expect(res.approved).toBe(false);
+      expect(res.message).toBe('Invalid code');
     });
   });
 });

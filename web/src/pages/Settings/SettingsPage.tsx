@@ -253,7 +253,7 @@ export const SettingsPage: React.FC = () => {
     setDeletionError(null);
     try {
       const res = await authService.verifyChildDeletionCode(childApprovalCode.trim());
-      if (res.valid) {
+      if (res.valid === true) {
         setDeletionStep(3);
       } else {
         setDeletionError(res.message || 'Invalid or expired approval code.');
