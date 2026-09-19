@@ -9,16 +9,30 @@ public class AccountDeletionStatusDto {
     private boolean hasConnectedParent;
     private String parentEmailMasked;
     private String message;
+    private boolean hasPendingApprovalCode = false;
+    private Long approvalCodeExpiresInSeconds;
+    private String deliveryStatus = "IDLE";
 
     public AccountDeletionStatusDto() {
     }
 
     public AccountDeletionStatusDto(RoleType role, boolean isChild, boolean hasConnectedParent, String parentEmailMasked, String message) {
+        this(role, isChild, hasConnectedParent, parentEmailMasked, message, false, null, "IDLE");
+    }
+
+    public AccountDeletionStatusDto(RoleType role, boolean isChild, boolean hasConnectedParent, String parentEmailMasked, String message, boolean hasPendingApprovalCode, Long approvalCodeExpiresInSeconds) {
+        this(role, isChild, hasConnectedParent, parentEmailMasked, message, hasPendingApprovalCode, approvalCodeExpiresInSeconds, hasPendingApprovalCode ? "DELIVERED" : "IDLE");
+    }
+
+    public AccountDeletionStatusDto(RoleType role, boolean isChild, boolean hasConnectedParent, String parentEmailMasked, String message, boolean hasPendingApprovalCode, Long approvalCodeExpiresInSeconds, String deliveryStatus) {
         this.role = role;
         this.isChild = isChild;
         this.hasConnectedParent = hasConnectedParent;
         this.parentEmailMasked = parentEmailMasked;
         this.message = message;
+        this.hasPendingApprovalCode = hasPendingApprovalCode;
+        this.approvalCodeExpiresInSeconds = approvalCodeExpiresInSeconds;
+        this.deliveryStatus = deliveryStatus != null ? deliveryStatus : "IDLE";
     }
 
     public RoleType getRole() { return role; }
@@ -35,4 +49,13 @@ public class AccountDeletionStatusDto {
 
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }
+
+    public boolean isHasPendingApprovalCode() { return hasPendingApprovalCode; }
+    public void setHasPendingApprovalCode(boolean hasPendingApprovalCode) { this.hasPendingApprovalCode = hasPendingApprovalCode; }
+
+    public Long getApprovalCodeExpiresInSeconds() { return approvalCodeExpiresInSeconds; }
+    public void setApprovalCodeExpiresInSeconds(Long approvalCodeExpiresInSeconds) { this.approvalCodeExpiresInSeconds = approvalCodeExpiresInSeconds; }
+
+    public String getDeliveryStatus() { return deliveryStatus; }
+    public void setDeliveryStatus(String deliveryStatus) { this.deliveryStatus = deliveryStatus; }
 }

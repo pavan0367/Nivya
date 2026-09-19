@@ -32,6 +32,7 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
@@ -115,12 +116,36 @@ public class AccountDeletionService {
         if (connectedParent.isPresent()) {
             User parent = connectedParent.get();
             String maskedEmail = maskEmail(parent.getEmail());
+
+            Optional<DeletionApprovalCode> latestCodeOpt = approvalCodeRepository
+                    .findFirstByChildUserIdOrderByCreatedAtDesc(user.getId());
+
+            String deliveryStatus = "IDLE";
+            boolean hasPendingCode = false;
+            Long expiresInSeconds = null;
+
+            if (latestCodeOpt.isPresent()) {
+                DeletionApprovalCode latest = latestCodeOpt.get();
+                if ("PENDING".equals(latest.getStatus()) && !latest.isExpired() && !latest.isExhausted() && !latest.isUsed()) {
+                    deliveryStatus = "DELIVERED";
+                    hasPendingCode = true;
+                    expiresInSeconds = Math.max(0, Duration.between(Instant.now(), latest.getExpiresAt()).getSeconds());
+                } else if ("DISPATCHING".equals(latest.getStatus()) && !latest.isExpired()) {
+                    deliveryStatus = "DISPATCHING";
+                } else if ("REVOKED".equals(latest.getStatus())) {
+                    deliveryStatus = "FAILED";
+                }
+            }
+
             return new AccountDeletionStatusDto(
                     RoleType.CHILD,
                     true,
                     true,
                     maskedEmail,
-                    "Child account is connected to a parent. Deletion requires parent approval."
+                    "Child account is connected to a parent. Deletion requires parent approval.",
+                    hasPendingCode,
+                    expiresInSeconds,
+                    deliveryStatus
             );
         } else {
             return new AccountDeletionStatusDto(
@@ -155,13 +180,15 @@ public class AccountDeletionService {
 
             User childUser = userRepository.findById(child.getId()).orElse(child);
 
-            // Invalidate any previously pending codes for this child
-            List<DeletionApprovalCode> pendingCodes = approvalCodeRepository.findAllByChildUserIdAndStatus(child.getId(), "PENDING");
-            for (DeletionApprovalCode oldCode : pendingCodes) {
+            // Invalidate any previously pending or dispatching codes for this child
+            List<DeletionApprovalCode> oldCodes = new ArrayList<>();
+            oldCodes.addAll(approvalCodeRepository.findAllByChildUserIdAndStatus(child.getId(), "PENDING"));
+            oldCodes.addAll(approvalCodeRepository.findAllByChildUserIdAndStatus(child.getId(), "DISPATCHING"));
+            for (DeletionApprovalCode oldCode : oldCodes) {
                 oldCode.revoke();
             }
-            if (!pendingCodes.isEmpty()) {
-                approvalCodeRepository.saveAll(pendingCodes);
+            if (!oldCodes.isEmpty()) {
+                approvalCodeRepository.saveAll(oldCodes);
             }
 
             // Generate 6-digit cryptographically secure code
@@ -170,7 +197,9 @@ public class AccountDeletionService {
             String codeHash = sha256(rawCode);
             Instant expiresAt = Instant.now().plus(Duration.ofMinutes(CODE_TTL_MINUTES));
 
+            // Persist initially with DISPATCHING status - code is NOT usable until email confirms delivery
             DeletionApprovalCode codeRecord = new DeletionApprovalCode(child.getId(), parent.getId(), codeHash, expiresAt);
+            codeRecord.setStatus("DISPATCHING");
             codeRecord = approvalCodeRepository.save(codeRecord);
 
             auditService.logEvent(child.getId(), "CHILD_DELETION_APPROVAL_REQUESTED",
@@ -192,27 +221,48 @@ public class AccountDeletionService {
         }
 
         // 2. Transaction is now committed. All locks on deletion_approval_codes and users are released.
-        // 3. ONLY AFTER COMMIT: Dispatch notification email to connected parent
+        // 3. ONLY AFTER COMMIT: Dispatch notification email to connected parent outside any DB transaction
         try {
             EmailSendResult result = emailService.sendChildDeletionApprovalEmail(
                     ctx.parentId(), ctx.parentEmail(), ctx.childId(), ctx.childName(), ctx.childEmail(), ctx.rawCode()
             );
-            if (!result.isSuccess()) {
+            if (result.isSuccess()) {
+                // Phase 3A: SUCCESS - Short DB transaction: Activate code from DISPATCHING to PENDING
+                transactionTemplate.executeWithoutResult(status -> {
+                    approvalCodeRepository.findById(ctx.codeRecordId()).ifPresent(code -> {
+                        if ("DISPATCHING".equals(code.getStatus())) {
+                            code.setStatus("PENDING");
+                            approvalCodeRepository.save(code);
+                        }
+                    });
+                });
+            } else {
                 log.error("Failed to deliver parent deletion approval email to {}: provider={}, error={}",
                         maskEmail(ctx.parentEmail()), result.getProvider(), result.getErrorMessage());
+                // Phase 3B: FAILURE - Short DB transaction: Revoke code
+                transactionTemplate.executeWithoutResult(status -> {
+                    approvalCodeRepository.findById(ctx.codeRecordId()).ifPresent(code -> {
+                        code.revoke();
+                        approvalCodeRepository.save(code);
+                    });
+                    auditService.logEvent(child.getId(), "CHILD_DELETION_EMAIL_FAILED",
+                            "Failed to send parent approval email. Code revoked.", "SYSTEM");
+                });
                 throw new IllegalStateException("Failed to send approval code to parent email: " + result.getErrorMessage());
             }
         } catch (Exception e) {
-            // Email delivery failed: revoke newly generated code in a separate short transaction
+            // Email delivery threw exception: ensure code is revoked in a short transaction
             transactionTemplate.executeWithoutResult(status -> {
                 approvalCodeRepository.findById(ctx.codeRecordId()).ifPresent(code -> {
-                    code.revoke();
-                    approvalCodeRepository.save(code);
+                    if (!"REVOKED".equals(code.getStatus())) {
+                        code.revoke();
+                        approvalCodeRepository.save(code);
+                    }
                 });
                 auditService.logEvent(child.getId(), "CHILD_DELETION_EMAIL_FAILED",
                         "Failed to send parent approval email. Code revoked.", "SYSTEM");
             });
-            throw e;
+            throw (e instanceof RuntimeException re) ? re : new RuntimeException(e);
         }
 
         String maskedEmail = maskEmail(ctx.parentEmail());

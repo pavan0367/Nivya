@@ -1,5 +1,12 @@
 import { apiClient } from './api';
 import { ApiResponse, AuthResponseData, RoleType, User, Device } from '../types/auth';
+let inFlightApprovalRequest: Promise<{
+  success: boolean;
+  approvalCodeRequired: boolean;
+  parentEmailMasked?: string;
+  expiresInMinutes: number;
+  message: string;
+}> | null = null;
 
 export const authService = {
   async login(email: string, password: string): Promise<AuthResponseData> {
@@ -136,13 +143,16 @@ export const authService = {
     }
     return paired ? '/dashboard' : '/pairing';
   },
-
   async getDeletionStatus(): Promise<{
     role: RoleType;
     isChild: boolean;
     hasConnectedParent: boolean;
     connectedParentEmailMasked?: string;
+    parentEmailMasked?: string;
     instructions: string;
+    hasPendingApprovalCode?: boolean;
+    approvalCodeExpiresInSeconds?: number;
+    deliveryStatus?: 'IDLE' | 'DISPATCHING' | 'DELIVERED' | 'FAILED';
   }> {
     const response = await apiClient.get('/account/deletion/status');
     return response.data.data;
@@ -155,8 +165,68 @@ export const authService = {
     expiresInMinutes: number;
     message: string;
   }> {
-    const response = await apiClient.post('/account/deletion/request-child-approval');
-    return response.data.data;
+    if (inFlightApprovalRequest) {
+      return inFlightApprovalRequest;
+    }
+
+    inFlightApprovalRequest = (async () => {
+      try {
+        // Request-specific timeout of 45000ms ensures HTTPS transactional email delivery
+        // has ample time to complete, while keeping global 15s timeout for other requests.
+        const response = await apiClient.post(
+          '/account/deletion/request-child-approval',
+          {},
+          { timeout: 45000 }
+        );
+        return response.data.data;
+      } catch (err: any) {
+        // If it was a client timeout or network abort without an HTTP response from the server,
+        // safely reconcile the status using deliveryStatus rather than assuming false failure:
+        const isTimeout =
+          err?.code === 'ECONNABORTED' ||
+          err?.message?.toLowerCase().includes('timeout') ||
+          (!err?.response && !err?.status);
+
+        if (isTimeout) {
+          // Bounded reconciliation: poll getDeletionStatus up to 5 times (max 10s total)
+          const maxReconcileAttempts = 5;
+          for (let attempt = 0; attempt < maxReconcileAttempts; attempt++) {
+            try {
+              const status = await authService.getDeletionStatus();
+              if (status.deliveryStatus === 'DELIVERED') {
+                return {
+                  success: true,
+                  approvalCodeRequired: true,
+                  parentEmailMasked: status.connectedParentEmailMasked || status.parentEmailMasked,
+                  expiresInMinutes: Math.max(1, Math.ceil((status.approvalCodeExpiresInSeconds || 900) / 60)),
+                  message: 'Approval code sent to your connected parent.',
+                };
+              }
+              if (status.deliveryStatus === 'FAILED') {
+                throw new Error('Failed to deliver parent approval code email.');
+              }
+              if (status.deliveryStatus === 'DISPATCHING') {
+                if (attempt < maxReconcileAttempts - 1) {
+                  await new Promise((resolve) => setTimeout(resolve, 2000));
+                  continue;
+                }
+              }
+            } catch (reconcileErr: any) {
+              if (reconcileErr.message === 'Failed to deliver parent approval code email.') {
+                throw reconcileErr;
+              }
+              // If status check request fails, do not invent success
+            }
+          }
+        }
+        // Genuine 4xx/5xx server response or failed reconciliation: re-throw actual error
+        throw err;
+      } finally {
+        inFlightApprovalRequest = null;
+      }
+    })();
+
+    return inFlightApprovalRequest;
   },
 
   async verifyChildDeletionCode(approvalCode: string): Promise<{

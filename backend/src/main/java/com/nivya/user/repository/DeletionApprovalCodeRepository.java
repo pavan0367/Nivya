@@ -12,6 +12,8 @@ public interface DeletionApprovalCodeRepository extends JpaRepository<DeletionAp
 
     Optional<DeletionApprovalCode> findFirstByChildUserIdAndStatusOrderByCreatedAtDesc(Long childUserId, String status);
 
+    Optional<DeletionApprovalCode> findFirstByChildUserIdOrderByCreatedAtDesc(Long childUserId);
+
     List<DeletionApprovalCode> findAllByChildUserIdAndStatus(Long childUserId, String status);
 
     @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)

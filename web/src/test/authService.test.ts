@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { authService } from '../services/authService';
+import { apiClient } from '../services/api';
 
 // Mock localStorage for Node test runner
 const createLocalStorageMock = () => {
@@ -27,6 +28,7 @@ Object.defineProperty(globalThis, 'localStorage', {
 describe('authService & Role Isolation', () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.restoreAllMocks();
   });
 
   it('correctly identifies unauthenticated sessions', () => {
@@ -210,5 +212,182 @@ describe('authService & Role Isolation', () => {
     expect(localStorage.getItem('nivya_user')).toBeNull();
     expect(authService.isAuthenticated()).toBe(false);
     expect(authService.getCurrentUser()).toBeNull();
+  });
+
+  describe('Child Deletion Approval Request Timeout & Deduplication', () => {
+    it('uses a request-specific timeout of 45000ms for child approval request', async () => {
+      const postSpy = vi.spyOn(apiClient, 'post').mockResolvedValueOnce({
+        data: {
+          data: {
+            success: true,
+            approvalCodeRequired: true,
+            parentEmailMasked: 'pa***@gmail.com',
+            expiresInMinutes: 15,
+            message: 'Approval code sent to your connected parent (pa***@gmail.com).',
+          },
+        },
+      });
+
+      const result = await authService.requestChildDeletionApproval();
+      expect(postSpy).toHaveBeenCalledWith(
+        '/account/deletion/request-child-approval',
+        {},
+        { timeout: 45000 }
+      );
+      expect(result.success).toBe(true);
+      expect(result.parentEmailMasked).toBe('pa***@gmail.com');
+    });
+
+    it('deduplicates in-flight approval requests so concurrent clicks share a single request', async () => {
+      let resolvePost: (val: any) => void;
+      const deferredPromise = new Promise((resolve) => {
+        resolvePost = resolve;
+      });
+
+      const postSpy = vi.spyOn(apiClient, 'post').mockReturnValueOnce(deferredPromise as any);
+
+      // Trigger two concurrent requests while first is still in flight
+      const call1 = authService.requestChildDeletionApproval();
+      const call2 = authService.requestChildDeletionApproval();
+
+      // Only ONE underlying API call should have been dispatched
+      expect(postSpy).toHaveBeenCalledTimes(1);
+
+      resolvePost!({
+        data: {
+          data: {
+            success: true,
+            approvalCodeRequired: true,
+            parentEmailMasked: 'pa***@nivya.local',
+            expiresInMinutes: 15,
+            message: 'Code dispatched',
+          },
+        },
+      });
+
+      const [res1, res2] = await Promise.all([call1, call2]);
+      expect(res1).toEqual(res2);
+      expect(res1.success).toBe(true);
+    });
+
+    it('reconciles client timeout using getDeletionStatus when deliveryStatus is DELIVERED', async () => {
+      // Simulate client timeout abort (no response from server)
+      vi.spyOn(apiClient, 'post').mockRejectedValueOnce({
+        code: 'ECONNABORTED',
+        message: 'timeout of 45000ms exceeded',
+      });
+
+      // Mock getDeletionStatus indicating code was successfully DELIVERED
+      vi.spyOn(authService, 'getDeletionStatus').mockResolvedValueOnce({
+        role: 'CHILD',
+        isChild: true,
+        hasConnectedParent: true,
+        connectedParentEmailMasked: 'pa***@gmail.com',
+        instructions: 'Parent approval required',
+        deliveryStatus: 'DELIVERED',
+        hasPendingApprovalCode: true,
+        approvalCodeExpiresInSeconds: 880,
+      });
+
+      const result = await authService.requestChildDeletionApproval();
+      expect(result.success).toBe(true);
+      expect(result.parentEmailMasked).toBe('pa***@gmail.com');
+      expect(result.expiresInMinutes).toBe(15);
+    });
+
+    it('polls while deliveryStatus is DISPATCHING and reconciles when it transitions to DELIVERED', async () => {
+      vi.spyOn(apiClient, 'post').mockRejectedValueOnce({
+        code: 'ECONNABORTED',
+        message: 'timeout of 45000ms exceeded',
+      });
+
+      // 1st poll: DISPATCHING; 2nd poll: DELIVERED
+      vi.spyOn(authService, 'getDeletionStatus')
+        .mockResolvedValueOnce({
+          role: 'CHILD',
+          isChild: true,
+          hasConnectedParent: true,
+          connectedParentEmailMasked: 'pa***@gmail.com',
+          instructions: 'Parent approval required',
+          deliveryStatus: 'DISPATCHING',
+          hasPendingApprovalCode: false,
+        })
+        .mockResolvedValueOnce({
+          role: 'CHILD',
+          isChild: true,
+          hasConnectedParent: true,
+          connectedParentEmailMasked: 'pa***@gmail.com',
+          instructions: 'Parent approval required',
+          deliveryStatus: 'DELIVERED',
+          hasPendingApprovalCode: true,
+          approvalCodeExpiresInSeconds: 890,
+        });
+
+      const result = await authService.requestChildDeletionApproval();
+      expect(result.success).toBe(true);
+      expect(result.parentEmailMasked).toBe('pa***@gmail.com');
+    });
+
+    it('throws error when deliveryStatus becomes FAILED during reconciliation', async () => {
+      vi.spyOn(apiClient, 'post').mockRejectedValueOnce({
+        code: 'ECONNABORTED',
+        message: 'timeout of 45000ms exceeded',
+      });
+
+      vi.spyOn(authService, 'getDeletionStatus').mockResolvedValueOnce({
+        role: 'CHILD',
+        isChild: true,
+        hasConnectedParent: true,
+        connectedParentEmailMasked: 'pa***@gmail.com',
+        instructions: 'Parent approval required',
+        deliveryStatus: 'FAILED',
+        hasPendingApprovalCode: false,
+      });
+
+      await expect(authService.requestChildDeletionApproval()).rejects.toThrow(
+        'Failed to deliver parent approval code email.'
+      );
+    });
+
+    it('does not fake success if client timeout occurs and deliveryStatus remains IDLE', async () => {
+      vi.spyOn(apiClient, 'post').mockRejectedValueOnce({
+        code: 'ECONNABORTED',
+        message: 'timeout of 45000ms exceeded',
+      });
+
+      vi.spyOn(authService, 'getDeletionStatus').mockResolvedValue({
+        role: 'CHILD',
+        isChild: true,
+        hasConnectedParent: true,
+        connectedParentEmailMasked: 'pa***@gmail.com',
+        instructions: 'Parent approval required',
+        deliveryStatus: 'IDLE',
+        hasPendingApprovalCode: false,
+      });
+
+      await expect(authService.requestChildDeletionApproval()).rejects.toMatchObject({
+        code: 'ECONNABORTED',
+      });
+    });
+
+    it('propagates genuine backend 4xx/5xx server errors without attempting reconciliation', async () => {
+      const getStatusSpy = vi.spyOn(authService, 'getDeletionStatus');
+
+      vi.spyOn(apiClient, 'post').mockRejectedValueOnce({
+        response: {
+          status: 400,
+          data: { message: 'Only child accounts can request parent deletion approval.' },
+        },
+      });
+
+      await expect(authService.requestChildDeletionApproval()).rejects.toMatchObject({
+        response: {
+          status: 400,
+        },
+      });
+
+      // Should not have called getDeletionStatus on real HTTP errors
+      expect(getStatusSpy).not.toHaveBeenCalled();
+    });
   });
 });

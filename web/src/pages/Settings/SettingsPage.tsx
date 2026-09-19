@@ -34,7 +34,11 @@ interface DeletionStatus {
   isChild: boolean;
   hasConnectedParent: boolean;
   connectedParentEmailMasked?: string;
+  parentEmailMasked?: string;
   instructions: string;
+  hasPendingApprovalCode?: boolean;
+  approvalCodeExpiresInSeconds?: number;
+  deliveryStatus?: 'IDLE' | 'DISPATCHING' | 'DELIVERED' | 'FAILED';
 }
 
 export const SettingsPage: React.FC = () => {
@@ -179,8 +183,14 @@ export const SettingsPage: React.FC = () => {
     try {
       const status = await authService.getDeletionStatus();
       setDeletionStatus(status);
-      if (status.connectedParentEmailMasked) {
-        setParentEmailMasked(status.connectedParentEmailMasked);
+      const parentEmail = status.connectedParentEmailMasked || status.parentEmailMasked;
+      if (parentEmail) {
+        setParentEmailMasked(parentEmail);
+      }
+      if ((status.deliveryStatus === 'DELIVERED' || status.hasPendingApprovalCode) && status.approvalCodeExpiresInSeconds && status.approvalCodeExpiresInSeconds > 0) {
+        setCodeRequested(true);
+        setTimerSeconds(status.approvalCodeExpiresInSeconds);
+        setDeletionStep(2);
       }
     } catch {
       // Fallback based on current user role
@@ -209,7 +219,7 @@ export const SettingsPage: React.FC = () => {
 
   const handleRequestChildCode = async (isResend: boolean | unknown = false) => {
     const resend = isResend === true;
-    if (resendCooldown > 0) return;
+    if (requestingCode || resendCooldown > 0) return;
     setRequestingCode(true);
     setDeletionError(null);
     setCodeResentNotice(null);
@@ -227,7 +237,7 @@ export const SettingsPage: React.FC = () => {
         setResendCooldown(60);
       }
     } catch (err: any) {
-      setDeletionError(err.response?.data?.message || 'Failed to request approval code from parent.');
+      setDeletionError(err.response?.data?.message || err.message || 'Failed to request approval code from parent.');
     } finally {
       setRequestingCode(false);
     }

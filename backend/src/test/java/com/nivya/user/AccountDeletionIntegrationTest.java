@@ -246,6 +246,14 @@ public class AccountDeletionIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.expiresInMinutes").value(15));
 
+        // 3b. Verify status reconciles active pending approval code
+        mockMvc.perform(get("/api/v1/account/deletion/status")
+                        .header("Authorization", "Bearer " + cToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.deliveryStatus").value("DELIVERED"))
+                .andExpect(jsonPath("$.data.hasPendingApprovalCode").value(true))
+                .andExpect(jsonPath("$.data.approvalCodeExpiresInSeconds").isNumber());
+
         // 4. Manually set known approval code in repository for testing
         String testCode = "482619";
         DeletionApprovalCode codeRecord = approvalCodeRepository
@@ -381,5 +389,54 @@ public class AccountDeletionIntegrationTest {
                 .filter(n -> "CHILD_DELETION_APPROVAL".equals(n.getNotificationType()) && parentEmail.equals(n.getRecipientEmail()))
                 .count();
         assertThat(childApprovalEmailCount).isGreaterThanOrEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("DISPATCHING approval code cannot be verified and reflects deliveryStatus=DISPATCHING")
+    void testDispatchingCodeCannotBeVerifiedAndReflectsInStatus() throws Exception {
+        long ts = System.currentTimeMillis();
+        String pEmail = "parent_disp_" + ts + "@nivya.local";
+        String cEmail = "child_disp_" + ts + "@nivya.local";
+
+        AuthResponse pAuth = registerUser("Parent Disp", pEmail, "Password123!", RoleType.PARENT);
+        AuthResponse cAuth = registerUser("Child Disp", cEmail, "Password123!", RoleType.CHILD);
+
+        User parent = userRepository.findById(pAuth.getUser().getId()).orElseThrow();
+        User child = userRepository.findById(cAuth.getUser().getId()).orElseThrow();
+
+        Family family = familyRepository.save(new Family("Family Disp " + ts, parent));
+        familyMemberRepository.save(new FamilyMember(family, parent, RoleType.PARENT));
+        familyMemberRepository.save(new FamilyMember(family, child, RoleType.CHILD));
+
+        // Create a code in DISPATCHING status (simulating in-flight email delivery)
+        String rawCode = "654321";
+        DeletionApprovalCode dispCode = new DeletionApprovalCode(
+                child.getId(), parent.getId(), sha256(rawCode), java.time.Instant.now().plus(java.time.Duration.ofMinutes(15))
+        );
+        dispCode.setStatus("DISPATCHING");
+        dispCode = approvalCodeRepository.save(dispCode);
+
+        // 1. Status endpoint must report DISPATCHING, hasPendingApprovalCode=false
+        mockMvc.perform(get("/api/v1/account/deletion/status")
+                        .header("Authorization", "Bearer " + cAuth.getAccessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.deliveryStatus").value("DISPATCHING"))
+                .andExpect(jsonPath("$.data.hasPendingApprovalCode").value(false));
+
+        // 2. verify-child-code must reject DISPATCHING code
+        VerifyChildCodeRequest verifyReq = new VerifyChildCodeRequest(rawCode);
+        mockMvc.perform(post("/api/v1/account/deletion/verify-child-code")
+                        .header("Authorization", "Bearer " + cAuth.getAccessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(verifyReq)))
+                .andExpect(status().isBadRequest());
+
+        // 3. deleteAccount must reject DISPATCHING code
+        DeleteAccountRequest delReq = new DeleteAccountRequest(null, rawCode);
+        mockMvc.perform(post("/api/v1/account/delete")
+                        .header("Authorization", "Bearer " + cAuth.getAccessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(delReq)))
+                .andExpect(status().isBadRequest());
     }
 }
