@@ -1,7 +1,15 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
+}
+
+// Apply Google Services plugin if google-services.json is present
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
 }
 
 android {
@@ -21,21 +29,67 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            val localProps = Properties()
+            val localPropsFile = rootProject.file("local.properties")
+            if (localPropsFile.exists()) {
+                FileInputStream(localPropsFile).use { localProps.load(it) }
+            }
+
+            val keystorePath = System.getenv("NIVYA_RELEASE_STORE_FILE")
+                ?: project.findProperty("NIVYA_RELEASE_STORE_FILE") as? String
+                ?: localProps.getProperty("NIVYA_RELEASE_STORE_FILE")
+            val storePass = System.getenv("NIVYA_RELEASE_STORE_PASSWORD")
+                ?: project.findProperty("NIVYA_RELEASE_STORE_PASSWORD") as? String
+                ?: localProps.getProperty("NIVYA_RELEASE_STORE_PASSWORD")
+            val keyAl = System.getenv("NIVYA_RELEASE_KEY_ALIAS")
+                ?: project.findProperty("NIVYA_RELEASE_KEY_ALIAS") as? String
+                ?: localProps.getProperty("NIVYA_RELEASE_KEY_ALIAS")
+            val keyPass = System.getenv("NIVYA_RELEASE_KEY_PASSWORD")
+                ?: project.findProperty("NIVYA_RELEASE_KEY_PASSWORD") as? String
+                ?: localProps.getProperty("NIVYA_RELEASE_KEY_PASSWORD")
+
+            val isSigningRequired = project.hasProperty("requireSigning") ||
+                System.getenv("REQUIRE_RELEASE_SIGNING") == "true"
+
+            if (!keystorePath.isNullOrBlank()) {
+                val ksFile = file(keystorePath)
+                if (ksFile.exists()) {
+                    storeFile = ksFile
+                    storePassword = storePass
+                    keyAlias = keyAl
+                    keyPassword = keyPass
+                } else if (isSigningRequired) {
+                    throw org.gradle.api.GradleException("Release signing keystore file not found at: $keystorePath")
+                }
+            } else if (isSigningRequired) {
+                throw org.gradle.api.GradleException(
+                    "Release signing credentials missing. Set NIVYA_RELEASE_STORE_FILE, NIVYA_RELEASE_STORE_PASSWORD, NIVYA_RELEASE_KEY_ALIAS, NIVYA_RELEASE_KEY_PASSWORD environment variables or Gradle properties."
+                )
+            }
+        }
+    }
+
     buildTypes {
         debug {
-            applicationIdSuffix = ".debug"
             isDebuggable = true
             buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8080/\"")
             buildConfigField("Boolean", "ENABLE_LOGGING", "true")
         }
         release {
             isDebuggable = false
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            buildConfigField("String", "API_BASE_URL", "\"https://api.nivya.local/\"")
+            val releaseSigning = signingConfigs.getByName("release")
+            if (releaseSigning.storeFile != null) {
+                signingConfig = releaseSigning
+            }
+            buildConfigField("String", "API_BASE_URL", "\"https://nivya-blbf.onrender.com/api/v1/\"")
             buildConfigField("Boolean", "ENABLE_LOGGING", "false")
         }
     }
@@ -61,6 +115,13 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+        unitTests.all {
+            it.forkEvery = 1
         }
     }
 
@@ -123,6 +184,9 @@ dependencies {
 
     // Firebase Cloud Messaging (FCM)
     implementation("com.google.firebase:firebase-messaging:23.4.1")
+
+    // Google Play Services Location
+    implementation("com.google.android.gms:play-services-location:21.3.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

@@ -12,10 +12,13 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.nivya.core.di.AppContainer
+import com.nivya.core.network.NetworkResult
 import com.nivya.ui.alerts.ChildAlertsScreen
 import com.nivya.ui.alerts.ChildAlertsViewModel
 import com.nivya.ui.alerts.ParentAlertsScreen
 import com.nivya.ui.alerts.ParentAlertsViewModel
+import com.nivya.ui.auth.EmailVerificationScreen
+import com.nivya.ui.auth.EmailVerificationViewModel
 import com.nivya.ui.auth.LoginScreen
 import com.nivya.ui.auth.LoginViewModel
 import com.nivya.ui.battery.ChildBatteryScreen
@@ -202,12 +205,19 @@ fun AppNavGraph(
                         viewModel = loginViewModel,
                         onAuthSuccess = { roleStr ->
                             coroutineScope.launch {
-                                val cachedFamily = try {
-                                    appContainer.database.familyDao().getFamily()
-                                } catch (_: Exception) {
-                                    null
+                                // Authoritative backend pairing query with local Room fallback
+                                val pairingResult = appContainer.pairingRepository.getPairingStatus()
+                                val isPaired = when (pairingResult) {
+                                    is NetworkResult.Success -> pairingResult.data.paired
+                                    else -> {
+                                        val cachedFamily = try {
+                                            appContainer.database.familyDao().getFamily()
+                                        } catch (_: Exception) {
+                                            null
+                                        }
+                                        cachedFamily?.isPaired == true
+                                    }
                                 }
-                                val isPaired = cachedFamily?.isPaired == true
                                 if (isPaired && !roleStr.isNullOrBlank()) {
                                     // Direct dashboard routing: bypass role selection & pairing screen
                                     val destination = if (roleStr.equals("PARENT", ignoreCase = true)) {
@@ -218,13 +228,44 @@ fun AppNavGraph(
                                     navController.navigate(destination) {
                                         popUpTo(NavigationDestination.Login.route) { inclusive = true }
                                     }
+                                } else if (!roleStr.isNullOrBlank()) {
+                                    // Unpaired setup flow: navigate directly to role pairing connection screen
+                                    val roleName = roleStr.uppercase()
+                                    navController.navigate("pairing/connection/$roleName") {
+                                        popUpTo(NavigationDestination.Login.route) { inclusive = true }
+                                    }
                                 } else {
-                                    // New / setup-incomplete user: Route to Role Selection
+                                    // New / role-undetermined user: Route to Role Selection
                                     navController.navigate(NavigationDestination.RoleSelection.route) {
                                         popUpTo(NavigationDestination.Login.route) { inclusive = true }
                                     }
                                 }
                             }
+                        },
+                        onNavigateToVerification = { email ->
+                            navController.navigate(NavigationDestination.EmailVerification.createRoute(email))
+                        }
+                    )
+                }
+
+                composable(
+                    route = NavigationDestination.EmailVerification.route,
+                    arguments = listOf(navArgument("email") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val rawEmail = backStackEntry.arguments?.getString("email") ?: ""
+                    val email = UriPathEncoder.decode(rawEmail)
+                    val verificationViewModel: EmailVerificationViewModel = viewModel(
+                        factory = EmailVerificationViewModel.provideFactory(email, appContainer.authRepository)
+                    )
+                    com.nivya.ui.auth.EmailVerificationScreen(
+                        viewModel = verificationViewModel,
+                        onVerificationSuccess = {
+                            navController.navigate(NavigationDestination.Login.route) {
+                                popUpTo(NavigationDestination.Login.route) { inclusive = true }
+                            }
+                        },
+                        onNavigateBackToLogin = {
+                            navController.popBackStack(NavigationDestination.Login.route, false)
                         }
                     )
                 }
@@ -273,17 +314,38 @@ fun AppNavGraph(
 
                 // 2. Parent Destinations
                 composable(route = NavigationDestination.ParentDashboard.route) {
-                    ParentDashboardScreen(onNavigateTo = { dest -> navController.navigate(dest.route) })
+                    val dashboardViewModel: ParentDashboardViewModel = viewModel(
+                        factory = ParentDashboardViewModel.provideFactory(
+                            pairingRepository = appContainer.pairingRepository,
+                            usageRepository = appContainer.usageRepository,
+                            deviceHealthRepository = appContainer.deviceHealthRepository,
+                            alertRepository = appContainer.alertRepository,
+                            convocationRepository = appContainer.convocationRepository,
+                            tokenStorage = appContainer.tokenStorage
+                        )
+                    )
+                    ParentDashboardScreen(
+                        onNavigateTo = { dest -> navController.navigate(dest.route) },
+                        viewModel = dashboardViewModel
+                    )
                 }
                 composable(route = NavigationDestination.ParentLiveActivity.route) {
                     val liveActivityViewModel: ParentLiveActivityViewModel = viewModel(
-                        factory = ParentLiveActivityViewModel.provideFactory(appContainer.liveActivityRepository)
+                        factory = ParentLiveActivityViewModel.provideFactory(
+                            liveActivityRepository = appContainer.liveActivityRepository,
+                            pairingRepository = appContainer.pairingRepository,
+                            tokenStorage = appContainer.tokenStorage
+                        )
                     )
                     ParentLiveActivityScreen(viewModel = liveActivityViewModel)
                 }
                 composable(route = NavigationDestination.ParentHistory.route) {
                     val historyViewModel: ParentHistoryViewModel = viewModel(
-                        factory = ParentHistoryViewModel.provideFactory(appContainer.historyRepository)
+                        factory = ParentHistoryViewModel.provideFactory(
+                            historyRepository = appContainer.historyRepository,
+                            pairingRepository = appContainer.pairingRepository,
+                            tokenStorage = appContainer.tokenStorage
+                        )
                     )
                     ParentHistoryScreen(viewModel = historyViewModel)
                 }
@@ -333,11 +395,19 @@ fun AppNavGraph(
                         onPairNewDevice = {
                             navController.navigate("pairing/connection/PARENT")
                         },
-                        pairingRepository = appContainer.pairingRepository
+                        pairingRepository = appContainer.pairingRepository,
+                        tokenStorage = appContainer.tokenStorage
                     )
                 }
                 composable(route = NavigationDestination.ParentSettings.route) {
-                    ParentSettingsScreen()
+                    ParentSettingsScreen(
+                        accountRepository = appContainer.accountRepository,
+                        onLogout = {
+                            navController.navigate(NavigationDestination.Login.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                    )
                 }
 
                 // 3. Child Destinations
@@ -401,8 +471,14 @@ fun AppNavGraph(
                 }
                 composable(route = NavigationDestination.ChildSettings.route) {
                     ChildSettingsScreen(
+                        accountRepository = appContainer.accountRepository,
                         pairingRepository = appContainer.pairingRepository,
                         onDisconnected = {
+                            navController.navigate(NavigationDestination.Login.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        },
+                        onLogout = {
                             navController.navigate(NavigationDestination.Login.route) {
                                 popUpTo(0) { inclusive = true }
                             }

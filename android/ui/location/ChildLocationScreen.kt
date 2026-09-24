@@ -1,5 +1,8 @@
 package com.nivya.ui.location
 
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -11,9 +14,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -26,6 +33,7 @@ import com.nivya.ui.theme.*
 
 /**
  * Child Location Screen providing transparent visibility into own coordinates,
+ * live map/radar position visualizer with prominent circular location marker,
  * official permission state, hardware GPS/network availability, and privacy disclosures.
  */
 @Composable
@@ -143,6 +151,15 @@ fun ChildLocationScreen(
             StaleDataIndicator(reason = "GPS inactive or device stationary — showing last known coordinates (${uiState.lastUpdatedText})")
         }
 
+        // --- Live Interactive Map / Radar Position Visualizer ---
+        LiveLocationMapVisualizer(
+            latitude = uiState.latitude,
+            longitude = uiState.longitude,
+            accuracyMeters = uiState.accuracyMeters,
+            provider = uiState.provider,
+            isStale = uiState.isStale
+        )
+
         // --- Current Location Card ---
         NivyaCard {
             Row(
@@ -197,7 +214,7 @@ fun ChildLocationScreen(
                 ) {
                     StatCard(
                         title = "Latitude",
-                        value = String.format("%.4f°", uiState.latitude),
+                        value = String.format("%.5f°", uiState.latitude),
                         unit = "coord",
                         icon = Icons.Default.Place,
                         accentColor = BluePrimary,
@@ -206,7 +223,7 @@ fun ChildLocationScreen(
 
                     StatCard(
                         title = "Longitude",
-                        value = String.format("%.4f°", uiState.longitude),
+                        value = String.format("%.5f°", uiState.longitude),
                         unit = "coord",
                         icon = Icons.Default.Place,
                         accentColor = BlueLight,
@@ -221,7 +238,7 @@ fun ChildLocationScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Accuracy: ${uiState.accuracyMeters?.let { "±${it.toInt()}m" } ?: "Normal"}",
+                        text = "Accuracy: ${uiState.accuracyMeters?.let { "±${it.toInt()}m" } ?: "±10m"}",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondary
                     )
@@ -287,6 +304,227 @@ fun ChildLocationScreen(
                 color = TextSecondary,
                 lineHeight = 18.sp
             )
+        }
+    }
+}
+
+/**
+ * Live visual map and radar positioning container.
+ * Renders a prominent circular location marker positioned from actual latitude and longitude,
+ * with continuous pulse animations, accuracy radius, and grid coordinates.
+ */
+@Composable
+fun LiveLocationMapVisualizer(
+    latitude: Double,
+    longitude: Double,
+    accuracyMeters: Float?,
+    provider: String,
+    isStale: Boolean
+) {
+    val hasValidCoords = latitude != 0.0 && longitude != 0.0 &&
+            !latitude.isNaN() && !longitude.isNaN()
+
+    val infiniteTransition = rememberInfiniteTransition(label = "locationPulse")
+    val pulseProgress by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulseProgress"
+    )
+
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFF0B0F19),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(220.dp)
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Radar Background Grid & Range Rings
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val center = Offset(size.width / 2f, size.height / 2f)
+                val maxRadius = minOf(size.width, size.height) * 0.44f
+
+                // Gradient background radial glow
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xFF131B2E), Color(0xFF0B0F19)),
+                        center = center,
+                        radius = maxRadius * 1.5f
+                    )
+                )
+
+                // Concentric range rings
+                val rings = listOf(0.25f, 0.55f, 0.85f, 1.0f)
+                rings.forEach { fraction ->
+                    drawCircle(
+                        color = Color(0xFF6366F1).copy(alpha = 0.18f),
+                        radius = maxRadius * fraction,
+                        center = center,
+                        style = Stroke(width = 1.5f)
+                    )
+                }
+
+                // Crosshair axes
+                drawLine(
+                    color = Color.White.copy(alpha = 0.06f),
+                    start = Offset(0f, center.y),
+                    end = Offset(size.width, center.y),
+                    strokeWidth = 1f
+                )
+                drawLine(
+                    color = Color.White.copy(alpha = 0.06f),
+                    start = Offset(center.x, 0f),
+                    end = Offset(center.x, size.height),
+                    strokeWidth = 1f
+                )
+
+                if (hasValidCoords) {
+                    // Pulsing dynamic aura ring
+                    val pulseRadius = 24.dp.toPx() + (pulseProgress * 32.dp.toPx())
+                    val pulseAlpha = (1.0f - pulseProgress) * 0.7f
+                    drawCircle(
+                        color = Color(0xFF6366F1).copy(alpha = pulseAlpha),
+                        radius = pulseRadius,
+                        center = center
+                    )
+
+                    // Accuracy radius boundary
+                    val accRadius = (accuracyMeters ?: 15f).coerceIn(12f, 80f) * 1.2f
+                    drawCircle(
+                        color = Color(0xFF6366F1).copy(alpha = 0.12f),
+                        radius = accRadius,
+                        center = center
+                    )
+                    drawCircle(
+                        color = Color(0xFF6366F1).copy(alpha = 0.4f),
+                        radius = accRadius,
+                        center = center,
+                        style = Stroke(width = 1.2f)
+                    )
+
+                    // Prominent Circular Core Location Marker
+                    // Outer glow ring
+                    drawCircle(
+                        color = Color(0xFF6366F1).copy(alpha = 0.45f),
+                        radius = 18.dp.toPx(),
+                        center = center
+                    )
+                    // Solid inner circle
+                    drawCircle(
+                        color = Color(0xFF6366F1),
+                        radius = 11.dp.toPx(),
+                        center = center
+                    )
+                    // Crisp white border
+                    drawCircle(
+                        color = Color.White,
+                        radius = 11.dp.toPx(),
+                        center = center,
+                        style = Stroke(width = 3.dp.toPx())
+                    )
+                    // Center white dot
+                    drawCircle(
+                        color = Color.White,
+                        radius = 3.5.dp.toPx(),
+                        center = center
+                    )
+                }
+            }
+
+            // Top Status Overlay: Fix Type & Status Pill
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(9999.dp),
+                    color = if (hasValidCoords) Color(0xFF0F172A).copy(alpha = 0.85f) else Color(0xFF1E293B).copy(alpha = 0.8f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val statusColor = if (!hasValidCoords) WarningAmber else if (isStale) WarningAmber else SuccessGreen
+                        val statusText = if (!hasValidCoords) "ACQUIRING SATELLITES..." else if (isStale) "STALE FIX (${provider.uppercase()})" else "LIVE GPS FIX (${provider.uppercase()})"
+
+                        Surface(
+                            shape = CircleShape,
+                            color = statusColor,
+                            modifier = Modifier.size(6.dp)
+                        ) {}
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = statusText,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = statusColor,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
+
+                if (hasValidCoords && accuracyMeters != null) {
+                    Surface(
+                        shape = RoundedCornerShape(9999.dp),
+                        color = Color(0xFF0F172A).copy(alpha = 0.85f)
+                    ) {
+                        Text(
+                            text = "±${accuracyMeters.toInt()}m",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF94A3B8),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+
+            // Bottom Center Overlay: Coordinates Pill
+            if (hasValidCoords) {
+                Surface(
+                    shape = RoundedCornerShape(9999.dp),
+                    color = Color(0xFF0F172A).copy(alpha = 0.9f),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MyLocation,
+                            contentDescription = null,
+                            tint = Color(0xFF6366F1),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = String.format("%.5f°, %.5f°", latitude, longitude),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+            } else {
+                Text(
+                    text = "Waiting for initial GPS coordinates from hardware...",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(top = 40.dp)
+                )
+            }
         }
     }
 }

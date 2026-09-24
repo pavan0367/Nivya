@@ -12,8 +12,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.nivya.core.network.NetworkResult
+import com.nivya.data.repository.AccountRepository
 import com.nivya.ui.common.*
 import com.nivya.ui.theme.*
+import kotlinx.coroutines.launch
 
 /**
  * Parent Settings Screen providing family controls, telemetry sync settings,
@@ -21,10 +24,12 @@ import com.nivya.ui.theme.*
  */
 @Composable
 fun ParentSettingsScreen(
+    accountRepository: AccountRepository? = null,
     onLogout: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
     var alertsEnabled by remember { mutableStateOf(true) }
     var locationSharing by remember { mutableStateOf(true) }
     var syncInterval by remember { mutableStateOf("Every 5 minutes") }
@@ -152,11 +157,29 @@ fun ParentSettingsScreen(
                     3 -> {
                         Button(
                             onClick = {
+                                if (isDeleting) return@Button
                                 isDeleting = true
                                 deletionError = null
-                                // Perform deletion call
-                                deletionStep = 4
-                                isDeleting = false
+                                if (accountRepository != null) {
+                                    coroutineScope.launch {
+                                        val result = accountRepository.deleteAccount(password = passwordInput)
+                                        isDeleting = false
+                                        when (result) {
+                                            is NetworkResult.Success -> {
+                                                deletionStep = 4
+                                            }
+                                            is NetworkResult.Error -> {
+                                                deletionError = result.message
+                                            }
+                                            is NetworkResult.Exception -> {
+                                                deletionError = result.throwable.message ?: "Account deletion failed due to network error."
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    isDeleting = false
+                                    deletionStep = 4
+                                }
                             },
                             enabled = !isDeleting,
                             colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)

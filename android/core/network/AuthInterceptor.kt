@@ -1,6 +1,6 @@
 package com.nivya.core.network
 
-import com.nivya.core.security.SecureTokenStorage
+import com.nivya.core.security.TokenStorage
 import okhttp3.Interceptor
 import okhttp3.Response
 
@@ -8,15 +8,15 @@ import okhttp3.Response
  * OkHttp Interceptor appending Bearer access token to authenticated requests.
  */
 class AuthInterceptor(
-    private val tokenStorage: SecureTokenStorage
+    private val tokenStorage: TokenStorage
 ) : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
 
-        // Skip auth header for registration/login endpoints
+        // Skip auth header for public authentication endpoints
         val path = originalRequest.url.encodedPath
-        if (path.contains("/auth/login") || path.contains("/auth/register")) {
+        if (path.contains("/auth/login") || path.contains("/auth/register") || path.contains("/auth/refresh")) {
             return chain.proceed(originalRequest)
         }
 

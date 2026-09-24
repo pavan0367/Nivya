@@ -12,5 +12,7 @@ data class LoginUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val isSuccess: Boolean = false,
-    val userRole: String? = null
+    val userRole: String? = null,
+    val requiresVerification: Boolean = false,
+    val unverifiedEmail: String? = null
 )

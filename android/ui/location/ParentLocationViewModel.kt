@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 data class ParentLocationUiState(
     val isLoading: Boolean = false,
     val deviceId: Long = 1L,
-    val deviceName: String = "Alex's Galaxy A54",
+    val deviceName: String = "",
     val currentLocation: LocationStatusResponseDto? = null,
     val historyPoints: List<LocationPointDto> = emptyList(),
     val isConsentGranted: Boolean = true,
@@ -34,27 +34,7 @@ class ParentLocationViewModel(
         ParentLocationUiState(
             isLoading = true,
             deviceId = deviceId,
-            currentLocation = LocationStatusResponseDto(
-                deviceId = deviceId,
-                deviceUuid = "dev-galaxy-a54",
-                deviceName = "Alex's Galaxy A54",
-                latitude = 37.7749,
-                longitude = -122.4194,
-                accuracyMeters = 12.0f,
-                altitudeMeters = 16.0,
-                speedMetersPerSec = 0.0f,
-                bearingDegrees = 0.0f,
-                provider = "gps",
-                isGpsAvailable = true,
-                isNetworkAvailable = true,
-                permissionState = "GRANTED",
-                isBackgroundConsented = true,
-                isStale = false,
-                staleDescription = null,
-                recordedAt = "Just now",
-                updatedAt = "Just now",
-                lastUpdateAgo = "Just now"
-            )
+            currentLocation = null
         )
     )
     val uiState: StateFlow<ParentLocationUiState> = _uiState.asStateFlow()

@@ -123,4 +123,33 @@ class LocationSyncUnitTest {
         val kmDiff = calculateDistance(37.7749, -122.4194, 37.7849, -122.4194)
         assertTrue(kmDiff > 1000.0)
     }
+
+    @Test
+    fun testCoordinateIntegrityValidation() {
+        val validSnapshot = com.nivya.services.location.LocationSnapshot(
+            latitude = 12.9716,
+            longitude = 77.5946,
+            accuracyMeters = 10f,
+            altitudeMeters = 900.0,
+            speedMetersPerSec = 0f,
+            bearingDegrees = 0f,
+            provider = "fused",
+            isGpsAvailable = true,
+            isNetworkAvailable = true,
+            permissionState = LocationPermissionState.GRANTED_BACKGROUND,
+            isBackgroundConsented = true,
+            isStale = false,
+            timestamp = System.currentTimeMillis()
+        )
+        assertTrue("Real GPS coordinates must be considered valid", validSnapshot.hasValidCoordinates)
+
+        val nullIslandSnapshot = validSnapshot.copy(latitude = 0.0, longitude = 0.0)
+        assertFalse("0.0, 0.0 Null Island coordinates must be rejected", nullIslandSnapshot.hasValidCoordinates)
+
+        val nanSnapshot = validSnapshot.copy(latitude = Double.NaN)
+        assertFalse("NaN latitude must be rejected", nanSnapshot.hasValidCoordinates)
+
+        val outOfBoundsSnapshot = validSnapshot.copy(latitude = 95.0)
+        assertFalse("Latitude > 90 must be rejected", outOfBoundsSnapshot.hasValidCoordinates)
+    }
 }

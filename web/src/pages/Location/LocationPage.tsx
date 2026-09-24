@@ -1,6 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { MapPin, Navigation, ShieldCheck, RefreshCw, Crosshair } from 'lucide-react';
+import { Navigation, ShieldCheck, RefreshCw, Crosshair, MapPin } from 'lucide-react';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 import { ContentCard, MetricCard } from '../../components/common/Card';
 import { StaleIndicator } from '../../components/common/StaleIndicator';
 import { DataTable, Column } from '../../components/common/Table';
@@ -9,6 +11,9 @@ import { ErrorBanner } from '../../components/common/ErrorState';
 import { telemetryService } from '../../services/telemetryService';
 import { websocketService } from '../../services/websocketService';
 import { LocationStatus } from '../../types/telemetry';
+import { isValidCoordinate } from '../../utils/locationUtils';
+
+export { isValidCoordinate };
 
 interface OutletContextType {
   activeDeviceId: number | null;
@@ -22,6 +27,12 @@ export const LocationPage: React.FC = () => {
 
   const [currentLoc, setCurrentLoc] = useState<LocationStatus | null>(null);
   const [history, setHistory] = useState<LocationStatus[]>([]);
+
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const markerRef = useRef<L.Marker | null>(null);
+  const accuracyCircleRef = useRef<L.Circle | null>(null);
+  const hasCenteredRef = useRef<boolean>(false);
 
   const loadLocationData = useCallback(async (isInitial = false) => {
     if (!activeDeviceId) {
@@ -39,14 +50,14 @@ export const LocationPage: React.FC = () => {
         telemetryService.getLocationHistory(activeDeviceId),
       ]);
 
-      if (curRes.status === 'fulfilled' && curRes.value) {
+      if (curRes.status === 'fulfilled' && curRes.value && isValidCoordinate(curRes.value.latitude, curRes.value.longitude)) {
         setCurrentLoc(curRes.value);
       } else {
         setCurrentLoc(null);
       }
 
       if (histRes.status === 'fulfilled' && histRes.value && histRes.value.length > 0) {
-        setHistory(histRes.value);
+        setHistory(histRes.value.filter((loc) => isValidCoordinate(loc.latitude, loc.longitude)));
       } else {
         setHistory([]);
       }
@@ -59,20 +70,161 @@ export const LocationPage: React.FC = () => {
     }
   }, [activeDeviceId]);
 
+  // Initial fetch and WebSocket subscription
   useEffect(() => {
+    hasCenteredRef.current = false;
     loadLocationData(true);
 
     if (activeDeviceId) {
       const unsub = websocketService.subscribe(
         `/topic/location/${activeDeviceId}`,
         (msg: LocationStatus) => {
-          setCurrentLoc(msg);
-          setHistory((prev) => [msg, ...prev.slice(0, 49)]);
+          if (isValidCoordinate(msg.latitude, msg.longitude)) {
+            setCurrentLoc(msg);
+            setHistory((prev) => [msg, ...prev.slice(0, 49)]);
+          }
         }
       );
-      return () => unsub();
+
+      const unsubReconnect = websocketService.onReconnect(() => {
+        loadLocationData(false);
+      });
+
+      return () => {
+        unsub();
+        unsubReconnect();
+      };
     }
   }, [activeDeviceId, loadLocationData]);
+
+  // Initialize and update Leaflet Map
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+
+    const hasValidCoords = currentLoc && isValidCoordinate(currentLoc.latitude, currentLoc.longitude);
+
+    if (hasValidCoords && currentLoc) {
+      const { latitude, longitude, accuracyMeters, locationName } = currentLoc;
+      const accuracy = Math.max(accuracyMeters || 15, 5);
+
+      // Create map if not yet initialized
+      if (!mapInstanceRef.current) {
+        const map = L.map(mapContainerRef.current, {
+          center: [latitude, longitude],
+          zoom: 16,
+          zoomControl: true,
+          attributionControl: true,
+        });
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          subdomains: 'abcd',
+          maxZoom: 19,
+        }).addTo(map);
+
+        mapInstanceRef.current = map;
+      }
+
+      const map = mapInstanceRef.current;
+
+      // Custom pulsing circular icon
+      const customIcon = L.divIcon({
+        className: 'custom-live-marker',
+        html: `
+          <div class="pulsing-marker-wrapper">
+            <div class="pulsing-ring ring-1"></div>
+            <div class="pulsing-ring ring-2"></div>
+            <div class="marker-core">
+              <div class="marker-dot"></div>
+            </div>
+          </div>
+        `,
+        iconSize: [44, 44],
+        iconAnchor: [22, 22],
+        popupAnchor: [0, -22],
+      });
+
+      // Update or create marker
+      if (!markerRef.current) {
+        markerRef.current = L.marker([latitude, longitude], {
+          icon: customIcon,
+          title: locationName || 'Child Device Position',
+        }).addTo(map);
+      } else {
+        markerRef.current.setLatLng([latitude, longitude]);
+      }
+
+      // Update or create accuracy circle
+      if (!accuracyCircleRef.current) {
+        accuracyCircleRef.current = L.circle([latitude, longitude], {
+          radius: accuracy,
+          color: '#6366f1',
+          weight: 1.5,
+          opacity: 0.6,
+          fillColor: '#6366f1',
+          fillOpacity: 0.12,
+        }).addTo(map);
+      } else {
+        accuracyCircleRef.current.setLatLng([latitude, longitude]);
+        accuracyCircleRef.current.setRadius(accuracy);
+      }
+
+      // Update popup content
+      markerRef.current.bindPopup(`
+        <div style="font-family: inherit; font-size: 0.825rem; line-height: 1.5; color: #0f172a; padding: 2px;">
+          <strong style="color: #4338ca; font-size: 0.875rem;">${locationName || 'Child Device'}</strong><br/>
+          <span><strong>Lat:</strong> ${latitude.toFixed(5)}</span><br/>
+          <span><strong>Lng:</strong> ${longitude.toFixed(5)}</span><br/>
+          <span><strong>Accuracy:</strong> ±${Math.round(accuracy)}m</span>
+        </div>
+      `);
+
+      // Initial center / smooth flyTo on new coordinates
+      if (!hasCenteredRef.current) {
+        map.setView([latitude, longitude], 16);
+        hasCenteredRef.current = true;
+      } else {
+        map.panTo([latitude, longitude], { animate: true, duration: 0.8 });
+      }
+
+      // Ensure leaflet tiles render properly if container size changed
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 200);
+    }
+
+    return () => {
+      // Map instance is preserved across minor coordinate changes, cleaned on activeDeviceId change or unmount
+    };
+  }, [currentLoc]);
+
+  // Teardown map on device switch or unmount
+  useEffect(() => {
+    return () => {
+      if (markerRef.current) {
+        markerRef.current.remove();
+        markerRef.current = null;
+      }
+      if (accuracyCircleRef.current) {
+        accuracyCircleRef.current.remove();
+        accuracyCircleRef.current = null;
+      }
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+      hasCenteredRef.current = false;
+    };
+  }, [activeDeviceId]);
+
+  const handleRecenter = () => {
+    if (mapInstanceRef.current && currentLoc && isValidCoordinate(currentLoc.latitude, currentLoc.longitude)) {
+      mapInstanceRef.current.flyTo([currentLoc.latitude, currentLoc.longitude], 16, {
+        animate: true,
+        duration: 1.2,
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -124,7 +276,7 @@ export const LocationPage: React.FC = () => {
       width: '15%',
       render: (item) => (
         <span className="badge badge-neutral" style={{ fontSize: '0.75rem' }}>
-          ±{item.accuracyMeters || 15}m
+          ±{Math.round(item.accuracyMeters || 15)}m
         </span>
       ),
     },
@@ -194,96 +346,72 @@ export const LocationPage: React.FC = () => {
         />
       </div>
 
-      {/* Radar Map Visualizer Card */}
+      {/* Real Live Map Visualizer Card */}
       <ContentCard
         id="card-location-radar"
-        title="Live Radar Visualization"
-        subtitle="Visual representation of the enrolled device within family safe bounds"
+        title="Live Interactive Device Map"
+        subtitle="Real-time geographic position of the enrolled child device"
       >
-        {currentLoc ? (
-          <div
-            style={{
-              height: '280px',
-              width: '100%',
-              borderRadius: 'var(--radius-md)',
-              background: 'radial-gradient(circle at center, #131b2e 0%, #0b0f19 80%)',
-              border: '1px solid var(--border-subtle)',
-              position: 'relative',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
-            }}
-          >
-            {/* Radar concentric rings */}
-            <div style={{ position: 'absolute', width: '220px', height: '220px', borderRadius: '50%', border: '1px dashed rgba(99, 102, 241, 0.25)' }} />
-            <div style={{ position: 'absolute', width: '150px', height: '150px', borderRadius: '50%', border: '1px solid rgba(99, 102, 241, 0.35)' }} />
-            <div style={{ position: 'absolute', width: '80px', height: '80px', borderRadius: '50%', border: '1px solid rgba(99, 102, 241, 0.5)' }} />
-
-            {/* Crosshairs */}
-            <div style={{ position: 'absolute', width: '100%', height: '1px', background: 'rgba(255, 255, 255, 0.05)' }} />
-            <div style={{ position: 'absolute', height: '100%', width: '1px', background: 'rgba(255, 255, 255, 0.05)' }} />
-
-            {/* Child Pin Pulse Marker */}
+        <div
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: '420px',
+            borderRadius: 'var(--radius-md)',
+            overflow: 'hidden',
+            border: '1px solid var(--border-subtle)',
+            backgroundColor: '#0b0f19',
+          }}
+        >
+          {currentLoc && isValidCoordinate(currentLoc.latitude, currentLoc.longitude) ? (
+            <>
+              <div
+                id="live-location-map"
+                ref={mapContainerRef}
+                style={{ width: '100%', height: '100%', zIndex: 1 }}
+              />
+              <button
+                type="button"
+                id="btn-recenter-location"
+                className="map-recenter-btn"
+                onClick={handleRecenter}
+                title="Recenter Map on Device"
+              >
+                <Crosshair size={15} />
+                <span>Recenter Device</span>
+              </button>
+            </>
+          ) : (
             <div
               style={{
-                position: 'relative',
-                zIndex: 2,
+                height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                cursor: 'pointer',
+                justifyContent: 'center',
+                color: 'var(--text-dim)',
+                fontSize: '0.875rem',
+                gap: '0.75rem',
               }}
             >
               <div
                 style={{
-                  width: '46px',
-                  height: '46px',
+                  width: '48px',
+                  height: '48px',
                   borderRadius: '50%',
-                  background: 'rgba(99, 102, 241, 0.25)',
+                  background: 'rgba(255, 255, 255, 0.04)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 0 25px var(--primary)',
-                  animation: 'pulseGlow 2.5s infinite',
+                  color: 'var(--text-muted)',
                 }}
               >
-                <div
-                  style={{
-                    width: '26px',
-                    height: '26px',
-                    borderRadius: '50%',
-                    background: 'var(--primary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#fff',
-                  }}
-                >
-                  <MapPin size={16} />
-                </div>
+                <MapPin size={24} />
               </div>
-              <div
-                style={{
-                  marginTop: '0.5rem',
-                  background: 'rgba(15, 23, 42, 0.85)',
-                  padding: '0.25rem 0.65rem',
-                  borderRadius: '9999px',
-                  fontSize: '0.75rem',
-                  color: '#fff',
-                  border: '1px solid var(--border-subtle)',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {currentLoc.locationName || 'Child Device'} (±{currentLoc.accuracyMeters || 10}m)
-              </div>
+              <span>Waiting for real-time device GPS coordinates from mobile...</span>
             </div>
-          </div>
-        ) : (
-          <div style={{ height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: '0.875rem' }}>
-            Waiting for real-time device GPS coordinates...
-          </div>
-        )}
+          )}
+        </div>
       </ContentCard>
 
       {/* Location Breadcrumb History Table */}

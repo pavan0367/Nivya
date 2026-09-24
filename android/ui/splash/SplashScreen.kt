@@ -48,14 +48,19 @@ fun SplashScreen(
             return@LaunchedEffect
         }
 
-        // Check local cached pairing in Room
-        val cachedFamily = try {
-            appContainer.database.familyDao().getFamily()
-        } catch (_: Exception) {
-            null
+        // Check backend authoritative pairing status with Room fallback
+        val pairingResult = appContainer.pairingRepository.getPairingStatus()
+        val isPaired = when (pairingResult) {
+            is com.nivya.core.network.NetworkResult.Success -> pairingResult.data.paired
+            else -> {
+                val cachedFamily = try {
+                    appContainer.database.familyDao().getFamily()
+                } catch (_: Exception) {
+                    null
+                }
+                cachedFamily?.isPaired == true
+            }
         }
-
-        val isPaired = cachedFamily?.isPaired == true
 
         if (isPaired && savedRole != null) {
             // Already-paired flow: directly open correct dashboard

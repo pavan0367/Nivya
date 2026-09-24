@@ -388,4 +388,85 @@ class LocationIntegrationTest {
 
         assertEquals(1, locationHistoryRepository.count());
     }
+
+    @Test
+    @DisplayName("Reject 0.0, 0.0 Null Island coordinates with 400 Bad Request")
+    void testRejectNullIslandCoordinates() throws Exception {
+        LocationTelemetryRequest request = new LocationTelemetryRequest(
+                "child-loc-uuid-1",
+                0.0,
+                0.0,
+                10.0f,
+                null,
+                0f,
+                0f,
+                "gps",
+                true,
+                true,
+                "GRANTED",
+                true,
+                "FOREGROUND",
+                Instant.now()
+        );
+
+        mockMvc.perform(post("/api/v1/location/telemetry")
+                        .header("Authorization", "Bearer " + childToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Reject out-of-bounds latitude/longitude with 400 Bad Request")
+    void testRejectOutOfBoundsCoordinates() throws Exception {
+        LocationTelemetryRequest invalidLatReq = new LocationTelemetryRequest(
+                "child-loc-uuid-1",
+                91.5,
+                77.5946,
+                10.0f,
+                null,
+                0f,
+                0f,
+                "gps",
+                true,
+                true,
+                "GRANTED",
+                true,
+                "FOREGROUND",
+                Instant.now()
+        );
+
+        mockMvc.perform(post("/api/v1/location/telemetry")
+                        .header("Authorization", "Bearer " + childToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidLatReq)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Reject telemetry submission when attempted by Parent account with 403 Forbidden")
+    void testParentCannotSubmitLocationTelemetry() throws Exception {
+        LocationTelemetryRequest req = new LocationTelemetryRequest(
+                "child-loc-uuid-1",
+                12.9716,
+                77.5946,
+                10.0f,
+                null,
+                0f,
+                0f,
+                "gps",
+                true,
+                true,
+                "GRANTED",
+                true,
+                "FOREGROUND",
+                Instant.now()
+        );
+
+        mockMvc.perform(post("/api/v1/location/telemetry")
+                        .header("Authorization", "Bearer " + parentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden());
+    }
 }

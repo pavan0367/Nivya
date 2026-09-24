@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.nivya.core.network.NetworkResult
+import com.nivya.data.repository.AccountRepository
 import com.nivya.data.repository.PairingRepository
 import com.nivya.ui.common.*
 import com.nivya.ui.theme.*
@@ -23,6 +24,7 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun ChildSettingsScreen(
+    accountRepository: AccountRepository? = null,
     pairingRepository: PairingRepository? = null,
     isConnectedToParent: Boolean = true,
     parentEmailMasked: String = "p***@example.com",
@@ -48,6 +50,33 @@ fun ChildSettingsScreen(
     var isVerifyingCode by remember { mutableStateOf(false) }
     var isDeletingAccount by remember { mutableStateOf(false) }
     var deletionError by remember { mutableStateOf<String?>(null) }
+    var connectedToParentState by remember { mutableStateOf(isConnectedToParent) }
+    var maskedParentEmailState by remember { mutableStateOf(parentEmailMasked) }
+    var deliveryStatusState by remember { mutableStateOf("IDLE") }
+    var hasPendingCodeState by remember { mutableStateOf(false) }
+    var codeExpiresInSecondsState by remember { mutableStateOf<Long?>(null) }
+
+    // Reconcile status from backend whenever delete modal opens
+    LaunchedEffect(showDeleteModal) {
+        if (showDeleteModal && accountRepository != null) {
+            when (val statusRes = accountRepository.getDeletionStatus()) {
+                is NetworkResult.Success -> {
+                    val status = statusRes.data
+                    connectedToParentState = status.hasConnectedParent
+                    status.parentEmailMasked?.let { if (it.isNotBlank()) maskedParentEmailState = it }
+                    deliveryStatusState = status.deliveryStatus
+                    hasPendingCodeState = status.hasPendingApprovalCode
+                    codeExpiresInSecondsState = status.approvalCodeExpiresInSeconds
+                }
+                is NetworkResult.Error -> {
+                    deletionError = statusRes.message
+                }
+                is NetworkResult.Exception -> {
+                    deletionError = statusRes.throwable.message
+                }
+            }
+        }
+    }
 
     // Disconnect code dialog (Invariant 5.1)
     if (showCodeDialog) {
@@ -179,16 +208,21 @@ fun ChildSettingsScreen(
                                 Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Text(text = "• Your personal profile and account credentials will be permanently erased.", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                                     Text(text = "• Your parent's account will NOT be deleted or affected.", style = MaterialTheme.typography.bodySmall, color = SuccessGreen, fontWeight = FontWeight.SemiBold)
-                                    if (isConnectedToParent) {
+                                    if (connectedToParentState) {
                                         Text(text = "• Because you are connected to a parent, deletion requires parent approval.", style = MaterialTheme.typography.bodySmall, color = BlueLight)
+                                        if (deliveryStatusState == "DISPATCHING") {
+                                            Text(text = "• Approval email is currently dispatching to parent ($maskedParentEmailState)...", style = MaterialTheme.typography.bodySmall, color = BlueLight)
+                                        } else if (deliveryStatusState == "FAILED") {
+                                            Text(text = "• Previous email dispatch failed. Please request a new approval code.", style = MaterialTheme.typography.bodySmall, color = ErrorRed)
+                                        }
                                     }
                                 }
                             }
                         }
                         2 -> {
-                            if (isConnectedToParent) {
+                            if (connectedToParentState) {
                                 Text(
-                                    text = "A 6-digit approval code was sent to your connected parent ($parentEmailMasked). Enter the code below:",
+                                    text = "A 6-digit approval code was sent to your connected parent ($maskedParentEmailState). Enter the code below:",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = TextPrimary
                                 )
@@ -245,31 +279,78 @@ fun ChildSettingsScreen(
                     1 -> {
                         Button(
                             onClick = {
-                                if (isConnectedToParent) {
+                                if (connectedToParentState) {
+                                    if (isRequestingApproval) return@Button
                                     isRequestingApproval = true
                                     deletionError = null
-                                    // Trigger code dispatch
-                                    isRequestingApproval = false
-                                    deletionStep = 2
+                                    if (accountRepository != null) {
+                                        coroutineScope.launch {
+                                            val result = accountRepository.requestChildApproval()
+                                            isRequestingApproval = false
+                                            when (result) {
+                                                is NetworkResult.Success -> {
+                                                    result.data.parentEmailMasked?.let { if (it.isNotBlank()) maskedParentEmailState = it }
+                                                    deliveryStatusState = "DELIVERED"
+                                                    hasPendingCodeState = true
+                                                    deletionStep = 2
+                                                }
+                                                is NetworkResult.Error -> {
+                                                    deletionError = result.message
+                                                }
+                                                is NetworkResult.Exception -> {
+                                                    deletionError = result.throwable.message ?: "Failed to request parent approval"
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        isRequestingApproval = false
+                                        deletionStep = 2
+                                    }
                                 } else {
                                     deletionStep = 2
                                 }
                             },
+                            enabled = !isRequestingApproval,
                             colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
                         ) {
-                            Text(if (isConnectedToParent) "Request Parent Approval" else "Continue")
+                            if (isRequestingApproval) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = TextPrimary)
+                            } else {
+                                Text(if (connectedToParentState) "Request Parent Approval" else "Continue")
+                            }
                         }
                     }
                     2 -> {
                         Button(
                             onClick = {
-                                if (isConnectedToParent) {
+                                if (connectedToParentState) {
                                     if (approvalCodeInput.length != 6) {
                                         deletionError = "Please enter the 6-digit approval code."
                                         return@Button
                                     }
+                                    if (isVerifyingCode) return@Button
+                                    isVerifyingCode = true
                                     deletionError = null
-                                    deletionStep = 3
+                                    if (accountRepository != null) {
+                                        coroutineScope.launch {
+                                            val result = accountRepository.verifyChildCode(approvalCodeInput)
+                                            isVerifyingCode = false
+                                            when (result) {
+                                                is NetworkResult.Success -> {
+                                                    deletionStep = 3
+                                                }
+                                                is NetworkResult.Error -> {
+                                                    deletionError = result.message
+                                                }
+                                                is NetworkResult.Exception -> {
+                                                    deletionError = result.throwable.message ?: "Verification failed"
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        isVerifyingCode = false
+                                        deletionStep = 3
+                                    }
                                 } else {
                                     if (passwordInput.isBlank()) {
                                         deletionError = "Please enter your password."
@@ -279,19 +360,45 @@ fun ChildSettingsScreen(
                                     deletionStep = 3
                                 }
                             },
+                            enabled = !isVerifyingCode && (if (connectedToParentState) approvalCodeInput.length == 6 else passwordInput.isNotBlank()),
                             colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
                         ) {
-                            Text("Verify & Proceed")
+                            if (isVerifyingCode) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = TextPrimary)
+                            } else {
+                                Text("Verify & Proceed")
+                            }
                         }
                     }
                     3 -> {
                         Button(
                             onClick = {
+                                if (isDeletingAccount) return@Button
                                 isDeletingAccount = true
                                 deletionError = null
-                                // Call delete endpoint
-                                deletionStep = 4
-                                isDeletingAccount = false
+                                if (accountRepository != null) {
+                                    coroutineScope.launch {
+                                        val result = accountRepository.deleteAccount(
+                                            password = if (connectedToParentState) null else passwordInput,
+                                            approvalCode = if (connectedToParentState) approvalCodeInput else null
+                                        )
+                                        isDeletingAccount = false
+                                        when (result) {
+                                            is NetworkResult.Success -> {
+                                                deletionStep = 4
+                                            }
+                                            is NetworkResult.Error -> {
+                                                deletionError = result.message
+                                            }
+                                            is NetworkResult.Exception -> {
+                                                deletionError = result.throwable.message ?: "Account deletion failed"
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    isDeletingAccount = false
+                                    deletionStep = 4
+                                }
                             },
                             enabled = !isDeletingAccount,
                             colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)

@@ -8,6 +8,7 @@ import com.nivya.core.network.NetworkMonitor
 import com.nivya.core.network.NivyaApiService
 import com.nivya.core.security.SecureTokenStorage
 import com.nivya.data.local.UserPreferencesDataStore
+import com.nivya.data.repository.AccountRepository
 import com.nivya.data.repository.AuthRepository
 import com.nivya.data.repository.BatteryRepository
 import com.nivya.data.repository.CleanUpRepository
@@ -23,6 +24,9 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * Dependency Injection container providing app-wide singletons.
@@ -46,6 +50,8 @@ interface AppContainer {
     val liveActivityRepository: com.nivya.data.repository.LiveActivityRepository
     val historyRepository: com.nivya.data.repository.HistoryRepository
     val convocationRepository: com.nivya.data.repository.ConvocationRepository
+    val accountRepository: AccountRepository
+    val realtimeManager: com.nivya.core.network.NivyaRealtimeManager
 }
 
 
@@ -72,17 +78,44 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         AuthInterceptor(tokenStorage)
     }
 
+    private val unauthenticatedOkHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .build()
+    }
+
+    val tokenAuthenticator: com.nivya.core.network.TokenAuthenticator by lazy {
+        com.nivya.core.network.TokenAuthenticator(
+            tokenStorage = tokenStorage,
+            baseUrl = BuildConfig.API_BASE_URL,
+            unauthenticatedClient = unauthenticatedOkHttpClient,
+            onSessionExpired = {
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        preferencesDataStore.clear()
+                        database.familyDao().clearFamily()
+                        database.deviceStatusDao().clearDevices()
+                    } catch (_: Exception) {}
+                }
+            }
+        )
+    }
+
     private val okHttpClient: OkHttpClient by lazy {
         val builder = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
             .addInterceptor(authInterceptor)
+            .authenticator(tokenAuthenticator)
 
         // Enable logging ONLY for debug builds to safeguard production privacy
         if (BuildConfig.ENABLE_LOGGING) {
             val logging = HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BODY
+                redactHeader("Authorization")
             }
             builder.addInterceptor(logging)
         }
@@ -92,7 +125,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
 
     private val retrofit: Retrofit by lazy {
         Retrofit.Builder()
-            .baseUrl(BuildConfig.API_BASE_URL)
+            .baseUrl(com.nivya.core.network.NetworkConfig.getRetrofitBaseUrl(BuildConfig.API_BASE_URL))
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
@@ -150,8 +183,21 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         com.nivya.data.repository.HistoryRepository(apiService, database.historyDao())
     }
 
+    override val realtimeManager: com.nivya.core.network.NivyaRealtimeManager by lazy {
+        com.nivya.core.network.NivyaRealtimeManager(
+            context = context,
+            okHttpClient = okHttpClient,
+            tokenProvider = { tokenStorage.getAccessToken() },
+            wsUrlProvider = { com.nivya.core.network.NetworkConfig.getWebSocketUrl(BuildConfig.API_BASE_URL) }
+        )
+    }
+
     override val convocationRepository: com.nivya.data.repository.ConvocationRepository by lazy {
-        com.nivya.data.repository.ConvocationRepository(apiService)
+        com.nivya.data.repository.ConvocationRepository(apiService, realtimeManager)
+    }
+
+    override val accountRepository: AccountRepository by lazy {
+        AccountRepository(apiService, tokenStorage, preferencesDataStore, database)
     }
 }
 

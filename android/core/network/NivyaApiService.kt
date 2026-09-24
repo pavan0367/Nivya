@@ -35,6 +35,17 @@ interface NivyaApiService {
     @GET("api/v1/auth/me")
     suspend fun getCurrentUser(): Response<ApiResponseDto<UserDto>>
 
+    // --- Email Verification ---
+    @POST("api/v1/email/verify/send")
+    suspend fun sendVerificationCode(
+        @Body request: VerificationCodeRequestDto
+    ): Response<ApiResponseDto<Map<String, String>>>
+
+    @POST("api/v1/email/verify/confirm")
+    suspend fun confirmVerificationCode(
+        @Body request: VerificationConfirmRequestDto
+    ): Response<ApiResponseDto<Map<String, Boolean>>>
+
     // --- Role Selection ---
     @POST("api/v1/role/select")
     suspend fun selectRole(
@@ -248,6 +259,16 @@ interface NivyaApiService {
     @GET("api/v1/convocation/parent/seen")
     suspend fun parentGetConvocationSeenState(): Response<ApiResponseDto<Map<String, Boolean>>>
 
+    @POST("api/v1/convocation/parent/message/{messageId}/unsend")
+    suspend fun parentUnsendConvocationMessage(
+        @retrofit2.http.Path("messageId") messageId: Long
+    ): Response<ApiResponseDto<Unit>>
+
+    @POST("api/v1/convocation/parent/message/{messageId}/pin")
+    suspend fun parentTogglePinMessage(
+        @retrofit2.http.Path("messageId") messageId: Long
+    ): Response<ApiResponseDto<ParentConvocationMessageDto>>
+
     @GET("api/v1/convocation/child/unread")
     suspend fun childGetConvocationUnread(): Response<ApiResponseDto<List<ChildConvocationMessageDto>>>
 
@@ -275,6 +296,23 @@ interface NivyaApiService {
 
     @GET("api/v1/devices/push-token/status")
     suspend fun getPushTokenStatus(): Response<ApiResponseDto<PushTokenResponseDto>>
+
+    // --- Account Deletion ---
+    @GET("api/v1/account/deletion/status")
+    suspend fun getDeletionStatus(): Response<ApiResponseDto<AccountDeletionStatusDto>>
+
+    @POST("api/v1/account/deletion/request-child-approval")
+    suspend fun requestChildDeletionApproval(): Response<ApiResponseDto<RequestChildApprovalResponseDto>>
+
+    @POST("api/v1/account/deletion/verify-child-code")
+    suspend fun verifyChildCode(
+        @Body request: VerifyChildCodeRequestDto
+    ): Response<ApiResponseDto<Map<String, Boolean>>>
+
+    @POST("api/v1/account/delete")
+    suspend fun deleteAccount(
+        @Body request: DeleteAccountRequestDto? = null
+    ): Response<ApiResponseDto<Map<String, String>>>
 }
 
 

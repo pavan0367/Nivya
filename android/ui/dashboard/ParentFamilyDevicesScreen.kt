@@ -8,6 +8,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material3.*
@@ -18,6 +19,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.nivya.core.network.NetworkResult
+import com.nivya.core.security.TokenStorage
 import com.nivya.data.repository.PairingRepository
 import com.nivya.ui.common.*
 import com.nivya.ui.theme.*
@@ -26,16 +28,34 @@ import kotlinx.coroutines.launch
 /**
  * Parent Family & Devices Screen managing linked family members, hardware endpoints,
  * and protected one-time disconnect code generation.
+ * Displays authoritative paired child devices and family details without demo fallbacks.
  */
 @Composable
 fun ParentFamilyDevicesScreen(
     onPairNewDevice: () -> Unit = {},
     pairingRepository: PairingRepository? = null,
+    tokenStorage: TokenStorage? = null,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
     val clipboardManager = LocalClipboardManager.current
+
+    val cachedFamily by pairingRepository?.getCachedFamily()?.collectAsState(initial = null) ?: remember { mutableStateOf(null) }
+    val cachedDevices by pairingRepository?.getCachedDevices()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
+
+    LaunchedEffect(Unit) {
+        pairingRepository?.getPairingStatus()
+    }
+
+    val parentUuid = tokenStorage?.getDeviceUuid()
+    val childDevices = remember(cachedDevices, parentUuid) {
+        if (parentUuid.isNullOrBlank()) {
+            cachedDevices
+        } else {
+            cachedDevices.filter { it.deviceUuid != parentUuid }
+        }
+    }
 
     var showDisconnectDialog by remember { mutableStateOf(false) }
     var disconnectCode by remember { mutableStateOf<String?>(null) }
@@ -129,15 +149,25 @@ fun ParentFamilyDevicesScreen(
             }
         }
 
-        SectionHeader(title = "Family Unit: FAM-NIVYA-01")
+        val familyCode = cachedFamily?.familyCode
+        val familyTitle = if (!familyCode.isNullOrBlank()) "Family Unit: $familyCode" else "Family Unit"
+        SectionHeader(title = familyTitle)
+
+        val familyName = cachedFamily?.familyName?.ifBlank { null } ?: "Family Unit"
+        val totalMembers = childDevices.size + 1
+        val memberSummary = if (childDevices.isEmpty()) {
+            "1 Active Member (Parent) • No child devices enrolled"
+        } else {
+            "$totalMembers Active Members • Mutual Consent Active"
+        }
 
         NivyaCard {
             Row(modifier = Modifier.fillMaxWidth()) {
                 Icon(imageVector = Icons.Default.Group, contentDescription = null, tint = BluePrimary)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
-                    Text(text = "The Nivya Family", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-                    Text(text = "2 Active Members • Mutual Consent Active", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    Text(text = familyName, style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                    Text(text = memberSummary, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                 }
             }
         }
@@ -148,23 +178,24 @@ fun ParentFamilyDevicesScreen(
             onActionClick = onPairNewDevice
         )
 
-        StatusSummaryCard(
-            deviceName = "Alex's Galaxy A54 (Child)",
-            isOnline = true,
-            batteryPct = 78,
-            networkType = "Wi-Fi (Home)",
-            isStale = false,
-            lastSeen = "Online now"
-        )
-
-        StatusSummaryCard(
-            deviceName = "Sarah's Pixel 8 (Parent - This Device)",
-            isOnline = true,
-            batteryPct = 92,
-            networkType = "Cellular 5G",
-            isStale = false,
-            lastSeen = "Active now"
-        )
+        if (childDevices.isEmpty()) {
+            EmptyState(
+                title = "No Child Devices Paired",
+                description = "Pair your child's device using a secure pairing code to monitor safety telemetry.",
+                icon = Icons.Default.Devices
+            )
+        } else {
+            childDevices.forEach { device ->
+                StatusSummaryCard(
+                    deviceName = "${device.deviceName} (Child)",
+                    isOnline = device.isOnline,
+                    batteryPct = device.batteryPct,
+                    networkType = device.networkType ?: (if (device.isOnline) "Connected" else "Offline"),
+                    isStale = device.isStale,
+                    lastSeen = if (device.isOnline) "Online now" else if (!device.lastSeenAt.isNullOrBlank()) "Last seen ${device.lastSeenAt}" else "Offline"
+                )
+            }
+        }
 
         Button(
             onClick = onPairNewDevice,

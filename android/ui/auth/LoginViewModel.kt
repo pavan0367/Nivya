@@ -72,17 +72,40 @@ class LoginViewModel(
 
             when (result) {
                 is NetworkResult.Success -> {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            isSuccess = true,
-                            userRole = result.data.user.role
-                        )
+                    val isPending = result.data.user.status?.equals("PENDING", ignoreCase = true) == true
+                    if (state.isRegisterMode && isPending) {
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                isSuccess = false,
+                                requiresVerification = true,
+                                unverifiedEmail = state.email.trim(),
+                                errorMessage = null
+                            )
+                        }
+                    } else {
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                isSuccess = true,
+                                requiresVerification = false,
+                                userRole = result.data.user.role
+                            )
+                        }
                     }
                 }
                 is NetworkResult.Error -> {
+                    val isUnverifiedError = result.code == 401 && (
+                        result.message.contains("not verified", ignoreCase = true) ||
+                        result.message.contains("verify your email", ignoreCase = true)
+                    )
                     _uiState.update {
-                        it.copy(isLoading = false, errorMessage = result.message)
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = result.message,
+                            requiresVerification = isUnverifiedError,
+                            unverifiedEmail = if (isUnverifiedError) state.email.trim() else null
+                        )
                     }
                 }
                 is NetworkResult.Exception -> {
@@ -95,6 +118,10 @@ class LoginViewModel(
                 }
             }
         }
+    }
+
+    fun resetVerificationState() {
+        _uiState.update { it.copy(requiresVerification = false) }
     }
 
     fun resetError() {

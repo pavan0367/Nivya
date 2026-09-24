@@ -73,6 +73,18 @@ public class LocationService {
 
     @Transactional
     public LocationStatusResponse recordLocation(LocationTelemetryRequest request, UserPrincipal principal) {
+        if (principal != null && principal.getRole() != com.nivya.role.RoleType.CHILD) {
+            throw new AccessDeniedException("Only enrolled Child devices can submit location telemetry");
+        }
+
+        if (Double.isNaN(request.getLatitude()) || Double.isNaN(request.getLongitude())
+                || Double.isInfinite(request.getLatitude()) || Double.isInfinite(request.getLongitude())) {
+            throw new IllegalArgumentException("Coordinates must be valid finite numbers");
+        }
+        if (request.getLatitude() == 0.0 && request.getLongitude() == 0.0) {
+            throw new IllegalArgumentException("Coordinates 0.0, 0.0 (Null Island) are not accepted as valid location telemetry");
+        }
+
         Device device = deviceRepository.findByDeviceUuid(request.getDeviceUuid())
                 .orElseThrow(() -> new ResourceNotFoundException("Device not found with UUID: " + request.getDeviceUuid()));
 

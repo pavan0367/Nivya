@@ -9,7 +9,7 @@ import androidx.security.crypto.MasterKey
  * Secure token storage using hardware-backed EncryptedSharedPreferences (AES-256 GCM).
  * Never persists plaintext credentials or secrets in source code or unencrypted storage.
  */
-class SecureTokenStorage(context: Context) {
+class SecureTokenStorage(context: Context) : TokenStorage {
 
     private val masterKey: MasterKey = MasterKey.Builder(context)
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -23,38 +23,38 @@ class SecureTokenStorage(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
-    fun saveTokens(accessToken: String, refreshToken: String) {
+    override fun saveTokens(accessToken: String, refreshToken: String) {
         sharedPreferences.edit()
             .putString(KEY_ACCESS_TOKEN, accessToken)
             .putString(KEY_REFRESH_TOKEN, refreshToken)
             .apply()
     }
 
-    fun getAccessToken(): String? {
+    override fun getAccessToken(): String? {
         return sharedPreferences.getString(KEY_ACCESS_TOKEN, null)
     }
 
-    fun getRefreshToken(): String? {
+    override fun getRefreshToken(): String? {
         return sharedPreferences.getString(KEY_REFRESH_TOKEN, null)
     }
 
-    fun saveUserRole(role: String) {
+    override fun saveUserRole(role: String) {
         sharedPreferences.edit()
             .putString(KEY_USER_ROLE, role)
             .apply()
     }
 
-    fun getUserRole(): String? {
+    override fun getUserRole(): String? {
         return sharedPreferences.getString(KEY_USER_ROLE, null)
     }
 
-    fun saveDeviceUuid(uuid: String) {
+    override fun saveDeviceUuid(uuid: String) {
         sharedPreferences.edit()
             .putString(KEY_DEVICE_UUID, uuid)
             .apply()
     }
 
-    fun getDeviceUuid(): String {
+    override fun getDeviceUuid(): String {
         var uuid = sharedPreferences.getString(KEY_DEVICE_UUID, null)
         if (uuid == null) {
             uuid = java.util.UUID.randomUUID().toString()
@@ -63,11 +63,11 @@ class SecureTokenStorage(context: Context) {
         return uuid
     }
 
-    fun clearAll() {
+    override fun clearAll() {
         sharedPreferences.edit().clear().apply()
     }
 
-    fun hasAccessToken(): Boolean {
+    override fun hasAccessToken(): Boolean {
         val token = getAccessToken()
         return !token.isNullOrBlank()
     }

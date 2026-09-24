@@ -12,6 +12,9 @@ sealed class NavigationDestination(val route: String, val title: String) {
     // Auth & Setup destinations
     object Splash : NavigationDestination("splash", "Splash")
     object Login : NavigationDestination("auth/login", "Login")
+    object EmailVerification : NavigationDestination("auth/verify_email/{email}", "Email Verification") {
+        fun createRoute(email: String): String = "auth/verify_email/${UriPathEncoder.encode(email)}"
+    }
     object RoleSelection : NavigationDestination("auth/role_selection", "Role Selection")
     object Connection : NavigationDestination("pairing/connection/{role}", "Connection")
 

@@ -1,5 +1,6 @@
 package com.nivya.ui.auth
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -21,7 +22,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import com.nivya.R
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -39,6 +42,7 @@ import com.nivya.ui.theme.PurpleAccent
 fun LoginScreen(
     viewModel: LoginViewModel,
     onAuthSuccess: (role: String?) -> Unit,
+    onNavigateToVerification: (email: String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -49,6 +53,14 @@ fun LoginScreen(
     LaunchedEffect(uiState.isSuccess) {
         if (uiState.isSuccess) {
             onAuthSuccess(uiState.userRole)
+        }
+    }
+
+    LaunchedEffect(uiState.requiresVerification, uiState.unverifiedEmail) {
+        if (uiState.requiresVerification && !uiState.unverifiedEmail.isNullOrBlank() && uiState.isRegisterMode) {
+            val email = uiState.unverifiedEmail!!
+            viewModel.resetVerificationState()
+            onNavigateToVerification(email)
         }
     }
 
@@ -68,20 +80,13 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             // Branding Header
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = BluePrimary.copy(alpha = 0.15f),
-                modifier = Modifier.size(72.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "NV",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = BluePrimary
-                    )
-                }
-            }
+            Image(
+                painter = painterResource(id = R.drawable.nivya_logo),
+                contentDescription = "Nivya Logo",
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(20.dp))
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -156,12 +161,28 @@ fun LoginScreen(
                                 .fillMaxWidth()
                                 .padding(bottom = 16.dp)
                         ) {
-                            Text(
-                                text = uiState.errorMessage ?: "",
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(12.dp)
-                            )
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = uiState.errorMessage ?: "",
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                if (uiState.requiresVerification && !uiState.unverifiedEmail.isNullOrBlank()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Button(
+                                        onClick = {
+                                            val targetEmail = uiState.unverifiedEmail ?: uiState.email
+                                            viewModel.resetVerificationState()
+                                            onNavigateToVerification(targetEmail)
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.fillMaxWidth().height(36.dp)
+                                    ) {
+                                        Text("Verify Email Now", fontSize = 12.sp, color = Color.White)
+                                    }
+                                }
+                            }
                         }
                     }
 

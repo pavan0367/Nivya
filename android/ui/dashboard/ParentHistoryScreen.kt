@@ -62,7 +62,7 @@ fun ParentHistoryScreen(
                     color = TextPrimary
                 )
                 Text(
-                    text = "Chronological audit log • Alex's Galaxy A54",
+                    text = if (uiState.deviceName.isNotBlank()) "Chronological audit log • ${uiState.deviceName}" else "Chronological audit log",
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary
                 )

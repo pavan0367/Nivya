@@ -14,13 +14,15 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'https://nivya-blbf.onrender.com',
         changeOrigin: true,
+        secure: false,
       },
       '/ws': {
-        target: 'http://localhost:8080',
+        target: 'https://nivya-blbf.onrender.com',
         ws: true,
         changeOrigin: true,
+        secure: false,
       },
     },
   },

@@ -59,8 +59,8 @@ class LocationRepository(
 
         val insertedId = locationDao.insertLocationReading(entity)
 
-        // If online and authenticated, push to backend & flush queue
-        if (networkMonitor.isOnline.value && tokenStorage.hasAccessToken()) {
+        // If online, authenticated, and coordinates are valid real fixes, push to backend & flush queue
+        if (snapshot.hasValidCoordinates && networkMonitor.isOnline.value && tokenStorage.hasAccessToken()) {
             try {
                 val isoDate = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
                     timeZone = TimeZone.getTimeZone("UTC")
@@ -109,6 +109,17 @@ class LocationRepository(
         }
 
         for (item in unsynced) {
+            val isValid = item.latitude != 0.0 && item.longitude != 0.0 &&
+                    !item.latitude.isNaN() && !item.longitude.isNaN() &&
+                    item.latitude >= -90.0 && item.latitude <= 90.0 &&
+                    item.longitude >= -180.0 && item.longitude <= 180.0
+
+            if (!isValid) {
+                // Discard invalid / zero fix from queue
+                syncedIds.add(item.id)
+                continue
+            }
+
             try {
                 val request = LocationTelemetryRequestDto(
                     deviceUuid = item.deviceUuid,

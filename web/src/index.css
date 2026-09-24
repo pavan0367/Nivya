@@ -371,3 +371,109 @@ small { color: var(--text-dim); font-size: 0.85rem; }
   background: var(--danger);
   box-shadow: 0 0 10px var(--danger);
 }
+
+/* ==========================================================================
+   Leaflet Map & Live Location Marker Styles
+   ========================================================================== */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background-color: #0b0f19 !important;
+  font-family: inherit;
+}
+
+.custom-live-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.pulsing-marker-wrapper {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pulsing-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid #6366f1;
+  opacity: 0.8;
+  animation: markerPulse 2.4s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+.pulsing-ring.ring-1 {
+  width: 36px;
+  height: 36px;
+}
+
+.pulsing-ring.ring-2 {
+  width: 44px;
+  height: 44px;
+  animation-delay: 0.8s;
+}
+
+@keyframes markerPulse {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.marker-core {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #6366f1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.85), inset 0 0 4px rgba(255, 255, 255, 0.6);
+  border: 2.5px solid #ffffff;
+  z-index: 10;
+}
+
+.marker-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+/* Custom Map Overlay Controls */
+.map-recenter-btn {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border-subtle);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.825rem;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s ease;
+}
+
+.map-recenter-btn:hover {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}

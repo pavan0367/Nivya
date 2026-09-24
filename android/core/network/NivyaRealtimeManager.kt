@@ -19,10 +19,11 @@ import kotlin.random.Random
  * safe reconnect on network loss via NetworkMonitor, and destination subscription routing.
  */
 class NivyaRealtimeManager(
-    private val context: Context,
+    private val context: Context? = null,
     private val okHttpClient: OkHttpClient,
     private val tokenProvider: () -> String?,
-    private val wsUrlProvider: () -> String = { "ws://10.0.2.2:8080/ws/websocket" }
+    private val wsUrlProvider: () -> String = { NetworkConfig.getWebSocketUrl() },
+    private val networkMonitor: NetworkMonitor? = context?.let { NetworkMonitor(it) }
 ) {
 
     companion object {
@@ -39,7 +40,6 @@ class NivyaRealtimeManager(
     }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val networkMonitor = NetworkMonitor(context)
 
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
@@ -55,18 +55,20 @@ class NivyaRealtimeManager(
 
     init {
         // Observe network changes: if network returns while disconnected/reconnecting, reconnect immediately
-        scope.launch {
-            networkMonitor.isOnline.collect { online ->
-                if (online && !isManuallyStopped && _connectionState.value != ConnectionState.CONNECTED) {
-                    Log.i(TAG, "Network restored. Triggering immediate safe reconnection...")
-                    reconnectJob?.cancel()
-                    reconnectAttempt = 0
-                    connectInternal()
-                } else if (!online && _connectionState.value == ConnectionState.CONNECTED) {
-                    Log.w(TAG, "Network lost. Marking as RECONNECTING...")
-                    _connectionState.value = ConnectionState.RECONNECTING
-                    webSocket?.cancel()
-                    webSocket = null
+        networkMonitor?.let { monitor ->
+            scope.launch {
+                monitor.isOnline.collect { online ->
+                    if (online && !isManuallyStopped && _connectionState.value != ConnectionState.CONNECTED) {
+                        Log.i(TAG, "Network restored. Triggering immediate safe reconnection...")
+                        reconnectJob?.cancel()
+                        reconnectAttempt = 0
+                        connectInternal()
+                    } else if (!online && _connectionState.value == ConnectionState.CONNECTED) {
+                        Log.w(TAG, "Network lost. Marking as RECONNECTING...")
+                        _connectionState.value = ConnectionState.RECONNECTING
+                        webSocket?.cancel()
+                        webSocket = null
+                    }
                 }
             }
         }
@@ -74,6 +76,9 @@ class NivyaRealtimeManager(
 
     @Synchronized
     fun start() {
+        if (_connectionState.value == ConnectionState.CONNECTED || _connectionState.value == ConnectionState.CONNECTING) {
+            return
+        }
         isManuallyStopped = false
         reconnectAttempt = 0
         connectInternal()
@@ -94,6 +99,12 @@ class NivyaRealtimeManager(
 
     private fun connectInternal() {
         if (isManuallyStopped) return
+
+        if (tokenProvider() == null) {
+            Log.d(TAG, "No auth token available, skipping realtime connection")
+            _connectionState.value = ConnectionState.DISCONNECTED
+            return
+        }
 
         _connectionState.value = if (reconnectAttempt > 0) ConnectionState.RECONNECTING else ConnectionState.CONNECTING
 
@@ -142,7 +153,7 @@ class NivyaRealtimeManager(
         ws.send(connectFrame)
     }
 
-    private fun handleIncomingStompFrame(rawFrame: String) {
+    internal fun handleIncomingStompFrame(rawFrame: String) {
         val lines = rawFrame.trimEnd('\u0000').lines()
         if (lines.isEmpty()) return
 
@@ -214,8 +225,13 @@ class NivyaRealtimeManager(
         Log.i(TAG, "Scheduling STOMP reconnect in ${delayMs}ms (attempt $reconnectAttempt)...")
         reconnectJob = scope.launch {
             delay(delayMs)
-            if (!isManuallyStopped && networkMonitor.isOnline.value) {
-                connectInternal()
+            val isOnline = networkMonitor?.isOnline?.value ?: true
+            if (!isManuallyStopped && isOnline) {
+                if (tokenProvider() != null) {
+                    connectInternal()
+                } else {
+                    _connectionState.value = ConnectionState.DISCONNECTED
+                }
             }
         }
     }
@@ -275,4 +291,16 @@ class NivyaRealtimeManager(
         val frame = "UNSUBSCRIBE\nid:$subId\n\n\u0000"
         ws.send(frame)
     }
+
+    internal fun setWebSocketForTest(ws: WebSocket?) {
+        this.webSocket = ws
+    }
+
+    internal fun setConnectionStateForTest(state: ConnectionState) {
+        _connectionState.value = state
+    }
+
+    internal fun getActiveSubIdsForTest(): Map<String, String> = activeSubIds
+
+    internal fun getSubscriptionsForTest(): Map<String, Set<(String) -> Unit>> = subscriptions
 }

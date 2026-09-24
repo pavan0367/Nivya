@@ -6,7 +6,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.nivya.core.navigation.NavigationDestination
@@ -15,13 +15,18 @@ import com.nivya.ui.theme.*
 
 /**
  * Summary-oriented Parent Dashboard providing immediate insight into family devices and health.
+ * Bound to real data via ParentDashboardViewModel with authoritative Room and API state.
  */
 @Composable
 fun ParentDashboardScreen(
     onNavigateTo: (NavigationDestination) -> Unit,
+    viewModel: ParentDashboardViewModel? = null,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
+    val uiState by viewModel?.uiState?.collectAsState() ?: remember {
+        mutableStateOf(ParentDashboardUiState())
+    }
 
     Column(
         modifier = modifier
@@ -37,15 +42,27 @@ fun ParentDashboardScreen(
             onActionClick = { onNavigateTo(NavigationDestination.ParentFamilyDevices) }
         )
 
-        StatusSummaryCard(
-            deviceName = "Alex's Galaxy A54",
-            isOnline = true,
-            batteryPct = 78,
-            networkType = "Wi-Fi (Home)",
-            isStale = false,
-            lastSeen = "Just now",
-            onClick = { onNavigateTo(NavigationDestination.ParentLiveActivity) }
-        )
+        if (uiState.hasChildDevice) {
+            StatusSummaryCard(
+                deviceName = uiState.childDeviceName,
+                isOnline = uiState.isOnline,
+                batteryPct = uiState.batteryPct,
+                networkType = uiState.networkType,
+                isStale = uiState.isStale,
+                lastSeen = uiState.lastSeen,
+                onClick = { onNavigateTo(NavigationDestination.ParentLiveActivity) }
+            )
+        } else {
+            StatusSummaryCard(
+                deviceName = uiState.childDeviceName,
+                isOnline = false,
+                batteryPct = null,
+                networkType = "No connection",
+                isStale = false,
+                lastSeen = uiState.lastSeen,
+                onClick = { onNavigateTo(NavigationDestination.ParentFamilyDevices) }
+            )
+        }
 
         // Section 2: Key Metric Cards (2x2 Grid)
         SectionHeader(title = "Health & Safety Overview")
@@ -56,8 +73,8 @@ fun ParentDashboardScreen(
         ) {
             StatCard(
                 title = "Screen Time",
-                value = "2h 45m",
-                unit = "today",
+                value = uiState.screenTimeFormatted,
+                unit = uiState.screenTimeUnit,
                 icon = Icons.Default.Timer,
                 accentColor = BluePrimary,
                 onClick = { onNavigateTo(NavigationDestination.ParentAppUsage) },
@@ -66,8 +83,8 @@ fun ParentDashboardScreen(
 
             StatCard(
                 title = "Device Health",
-                value = "94%",
-                unit = "good",
+                value = uiState.deviceHealthFormatted,
+                unit = uiState.deviceHealthUnit,
                 icon = Icons.Default.Favorite,
                 accentColor = SuccessGreen,
                 onClick = { onNavigateTo(NavigationDestination.ParentDeviceHealth) },
@@ -81,8 +98,8 @@ fun ParentDashboardScreen(
         ) {
             StatCard(
                 title = "Active Alerts",
-                value = "2",
-                unit = "attention",
+                value = uiState.activeAlertsCount,
+                unit = uiState.activeAlertsUnit,
                 icon = Icons.Default.Notifications,
                 accentColor = WarningAmber,
                 onClick = { onNavigateTo(NavigationDestination.ParentAlerts) },
@@ -91,8 +108,8 @@ fun ParentDashboardScreen(
 
             StatCard(
                 title = "Convocation",
-                value = "1",
-                unit = "unread",
+                value = uiState.convocationCount,
+                unit = uiState.convocationUnit,
                 icon = Icons.Default.Mail,
                 accentColor = PurpleAccent,
                 onClick = { onNavigateTo(NavigationDestination.ParentConvocation) },

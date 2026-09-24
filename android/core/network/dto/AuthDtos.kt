@@ -39,3 +39,18 @@ data class UserDto(
     @SerializedName("role") val role: String,
     @SerializedName("status") val status: String?
 )
+
+/**
+ * Email verification request DTOs matching com.nivya.email.dto contracts.
+ */
+data class VerificationCodeRequestDto(
+    @SerializedName("email") val email: String,
+    @SerializedName("purpose") val purpose: String = "EMAIL_VERIFICATION"
+)
+
+data class VerificationConfirmRequestDto(
+    @SerializedName("email") val email: String,
+    @SerializedName("code") val code: String,
+    @SerializedName("purpose") val purpose: String = "EMAIL_VERIFICATION"
+)
+
