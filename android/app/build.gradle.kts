@@ -27,6 +27,17 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        val localProps = Properties()
+        val localPropsFile = rootProject.file("local.properties")
+        if (localPropsFile.exists()) {
+            FileInputStream(localPropsFile).use { localProps.load(it) }
+        }
+        val mapsApiKey = System.getenv("MAPS_API_KEY")
+            ?: (project.findProperty("MAPS_API_KEY") as? String)
+            ?: localProps.getProperty("MAPS_API_KEY", "")
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+        buildConfigField("String", "MAPS_API_KEY", "\"${mapsApiKey}\"")
     }
 
     signingConfigs {
@@ -185,8 +196,12 @@ dependencies {
     // Firebase Cloud Messaging (FCM)
     implementation("com.google.firebase:firebase-messaging:23.4.1")
 
-    // Google Play Services Location
+    // Google Play Services Location (hardware GPS telemetry)
     implementation("com.google.android.gms:play-services-location:21.3.0")
+
+    // OpenStreetMap Android Library (Free OSM visualization)
+    implementation("org.osmdroid:osmdroid-android:6.1.18")
+
 
     // Testing
     testImplementation("junit:junit:4.13.2")

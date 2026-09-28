@@ -15,6 +15,8 @@ import { isValidCoordinate } from '../../utils/locationUtils';
 
 export { isValidCoordinate };
 
+export const GOOGLE_MAPS_API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
+
 interface OutletContextType {
   activeDeviceId: number | null;
 }
@@ -97,105 +99,98 @@ export const LocationPage: React.FC = () => {
     }
   }, [activeDeviceId, loadLocationData]);
 
-  // Initialize and update Leaflet Map
+  // Initialize and update OpenStreetMap (Leaflet) instance
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
     const hasValidCoords = currentLoc && isValidCoordinate(currentLoc.latitude, currentLoc.longitude);
+    if (!hasValidCoords || !currentLoc) return;
 
-    if (hasValidCoords && currentLoc) {
-      const { latitude, longitude, accuracyMeters, locationName } = currentLoc;
-      const accuracy = Math.max(accuracyMeters || 15, 5);
+    const { latitude, longitude, accuracyMeters, locationName } = currentLoc;
+    const accuracy = Math.max(accuracyMeters || 15, 5);
 
-      // Create map if not yet initialized
-      if (!mapInstanceRef.current) {
-        const map = L.map(mapContainerRef.current, {
-          center: [latitude, longitude],
-          zoom: 16,
-          zoomControl: true,
-          attributionControl: true,
-        });
-
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-          subdomains: 'abcd',
-          maxZoom: 19,
-        }).addTo(map);
-
-        mapInstanceRef.current = map;
-      }
-
-      const map = mapInstanceRef.current;
-
-      // Custom pulsing circular icon
-      const customIcon = L.divIcon({
-        className: 'custom-live-marker',
-        html: `
-          <div class="pulsing-marker-wrapper">
-            <div class="pulsing-ring ring-1"></div>
-            <div class="pulsing-ring ring-2"></div>
-            <div class="marker-core">
-              <div class="marker-dot"></div>
-            </div>
-          </div>
-        `,
-        iconSize: [44, 44],
-        iconAnchor: [22, 22],
-        popupAnchor: [0, -22],
+    // Initialize Leaflet Map with HTTPS OpenStreetMap tiles if not yet created
+    if (!mapInstanceRef.current) {
+      const map = L.map(mapContainerRef.current, {
+        center: [latitude, longitude],
+        zoom: 16,
+        zoomControl: true,
+        attributionControl: true,
       });
 
-      // Update or create marker
-      if (!markerRef.current) {
-        markerRef.current = L.marker([latitude, longitude], {
-          icon: customIcon,
-          title: locationName || 'Child Device Position',
-        }).addTo(map);
-      } else {
-        markerRef.current.setLatLng([latitude, longitude]);
-      }
+      // Standard HTTPS OpenStreetMap tiles with visible attribution (zero billing, 100% free)
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+      }).addTo(map);
 
-      // Update or create accuracy circle
-      if (!accuracyCircleRef.current) {
-        accuracyCircleRef.current = L.circle([latitude, longitude], {
-          radius: accuracy,
-          color: '#6366f1',
-          weight: 1.5,
-          opacity: 0.6,
-          fillColor: '#6366f1',
-          fillOpacity: 0.12,
-        }).addTo(map);
-      } else {
-        accuracyCircleRef.current.setLatLng([latitude, longitude]);
-        accuracyCircleRef.current.setRadius(accuracy);
-      }
-
-      // Update popup content
-      markerRef.current.bindPopup(`
-        <div style="font-family: inherit; font-size: 0.825rem; line-height: 1.5; color: #0f172a; padding: 2px;">
-          <strong style="color: #4338ca; font-size: 0.875rem;">${locationName || 'Child Device'}</strong><br/>
-          <span><strong>Lat:</strong> ${latitude.toFixed(5)}</span><br/>
-          <span><strong>Lng:</strong> ${longitude.toFixed(5)}</span><br/>
-          <span><strong>Accuracy:</strong> ±${Math.round(accuracy)}m</span>
-        </div>
-      `);
-
-      // Initial center / smooth flyTo on new coordinates
-      if (!hasCenteredRef.current) {
-        map.setView([latitude, longitude], 16);
-        hasCenteredRef.current = true;
-      } else {
-        map.panTo([latitude, longitude], { animate: true, duration: 0.8 });
-      }
-
-      // Ensure leaflet tiles render properly if container size changed
-      setTimeout(() => {
-        map.invalidateSize();
-      }, 200);
+      mapInstanceRef.current = map;
     }
 
-    return () => {
-      // Map instance is preserved across minor coordinate changes, cleaned on activeDeviceId change or unmount
-    };
+    const map = mapInstanceRef.current;
+
+    // Custom pulsing circular icon
+    const customIcon = L.divIcon({
+      className: 'custom-live-marker',
+      html: `
+        <div class="pulsing-marker-wrapper">
+          <div class="pulsing-ring ring-1"></div>
+          <div class="pulsing-ring ring-2"></div>
+          <div class="marker-core">
+            <div class="marker-dot"></div>
+          </div>
+        </div>
+      `,
+      iconSize: [44, 44],
+      iconAnchor: [22, 22],
+      popupAnchor: [0, -22],
+    });
+
+    // Create or update marker position from actual telemetry only
+    if (!markerRef.current) {
+      markerRef.current = L.marker([latitude, longitude], {
+        icon: customIcon,
+        title: locationName || 'Child Device Position',
+      }).addTo(map);
+    } else {
+      markerRef.current.setLatLng([latitude, longitude]);
+    }
+
+    // Bind / update popup
+    markerRef.current.bindPopup(`
+      <div style="font-family: inherit; font-size: 0.825rem; line-height: 1.5; color: #0f172a; padding: 2px;">
+        <strong style="color: #4338ca; font-size: 0.875rem;">${locationName || 'Child Device'}</strong><br/>
+        <span><strong>Lat:</strong> ${latitude.toFixed(5)}</span><br/>
+        <span><strong>Lng:</strong> ${longitude.toFixed(5)}</span><br/>
+        <span><strong>Accuracy:</strong> ±${Math.round(accuracy)}m</span>
+      </div>
+    `);
+
+    // Create or update accuracy circle
+    if (!accuracyCircleRef.current) {
+      accuracyCircleRef.current = L.circle([latitude, longitude], {
+        radius: accuracy,
+        color: '#6366f1',
+        weight: 1.5,
+        opacity: 0.6,
+        fillColor: '#6366f1',
+        fillOpacity: 0.15,
+      }).addTo(map);
+    } else {
+      accuracyCircleRef.current.setLatLng([latitude, longitude]);
+      accuracyCircleRef.current.setRadius(accuracy);
+    }
+
+    // UX Rule: Only center camera on initial valid location fix
+    // DO NOT panTo or setView on subsequent WebSocket telemetry updates to prevent hijacking user pan/zoom
+    if (!hasCenteredRef.current) {
+      map.setView([latitude, longitude], 16);
+      hasCenteredRef.current = true;
+    }
+
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 200);
   }, [currentLoc]);
 
   // Teardown map on device switch or unmount
@@ -221,10 +216,11 @@ export const LocationPage: React.FC = () => {
     if (mapInstanceRef.current && currentLoc && isValidCoordinate(currentLoc.latitude, currentLoc.longitude)) {
       mapInstanceRef.current.flyTo([currentLoc.latitude, currentLoc.longitude], 16, {
         animate: true,
-        duration: 1.2,
+        duration: 1.0,
       });
     }
   };
+
 
   if (loading) {
     return (

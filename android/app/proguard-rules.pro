@@ -61,3 +61,7 @@
     public static **[] values();
     public static ** valueOf(java.lang.String);
 }
+
+# 10. OpenStreetMap (osmdroid)
+-keep class org.osmdroid.** { *; }
+-dontwarn org.osmdroid.**

@@ -26,10 +26,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.viewinterop.AndroidView
+import com.nivya.BuildConfig
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Polygon
 import com.nivya.permissions.location.LocationPermissionHelper
 import com.nivya.permissions.location.LocationPermissionState
 import com.nivya.ui.common.*
 import com.nivya.ui.theme.*
+import kotlinx.coroutines.launch
+
 
 /**
  * Child Location Screen providing transparent visibility into own coordinates,
@@ -322,120 +332,266 @@ fun LiveLocationMapVisualizer(
     isStale: Boolean
 ) {
     val hasValidCoords = latitude != 0.0 && longitude != 0.0 &&
-            !latitude.isNaN() && !longitude.isNaN()
+            !latitude.isNaN() && !longitude.isNaN() &&
+            latitude >= -90.0 && latitude <= 90.0 &&
+            longitude >= -180.0 && longitude <= 180.0
 
-    val infiniteTransition = rememberInfiniteTransition(label = "locationPulse")
-    val pulseProgress by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pulseProgress"
-    )
+    var hasCenteredInitial by remember { mutableStateOf(false) }
+    var mapViewRef by remember { mutableStateOf<MapView?>(null) }
+    var markerRef by remember { mutableStateOf<Marker?>(null) }
+    var circleRef by remember { mutableStateOf<Polygon?>(null) }
 
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = Color(0xFF0B0F19),
         modifier = Modifier
             .fillMaxWidth()
-            .height(220.dp)
+            .height(240.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Radar Background Grid & Range Rings
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val center = Offset(size.width / 2f, size.height / 2f)
-                val maxRadius = minOf(size.width, size.height) * 0.44f
+            if (hasValidCoords) {
+                val geoPoint = remember(latitude, longitude) { GeoPoint(latitude, longitude) }
+                val accuracyRadius = (accuracyMeters ?: 15f).toDouble().coerceAtLeast(5.0)
 
-                // Gradient background radial glow
-                drawRect(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color(0xFF131B2E), Color(0xFF0B0F19)),
-                        center = center,
-                        radius = maxRadius * 1.5f
-                    )
+                AndroidView(
+                    factory = { ctx ->
+                        Configuration.getInstance().userAgentValue = ctx.packageName
+                        MapView(ctx).apply {
+                            setTileSource(TileSourceFactory.MAPNIK)
+                            setMultiTouchControls(true)
+                            zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
+                            controller.setZoom(16.0)
+                            controller.setCenter(geoPoint)
+
+                            val marker = Marker(this).apply {
+                                position = geoPoint
+                                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                                title = "Child Device Position"
+                                snippet = "±${(accuracyMeters ?: 15f).toInt()}m accuracy"
+                            }
+                            overlays.add(marker)
+                            markerRef = marker
+
+                            val circle = Polygon(this).apply {
+                                points = Polygon.pointsAsCircle(geoPoint, accuracyRadius)
+                                fillPaint.color = android.graphics.Color.argb(38, 99, 102, 241)
+                                outlinePaint.color = android.graphics.Color.argb(153, 99, 102, 241)
+                                outlinePaint.strokeWidth = 3f
+                            }
+                            overlays.add(0, circle)
+                            circleRef = circle
+
+                            mapViewRef = this
+                            hasCenteredInitial = true
+                        }
+                    },
+                    update = { mv ->
+                        markerRef?.let { m ->
+                            m.position = geoPoint
+                            m.snippet = "±${(accuracyMeters ?: 15f).toInt()}m accuracy"
+                        }
+                        circleRef?.let { c ->
+                            c.points = Polygon.pointsAsCircle(geoPoint, accuracyRadius)
+                        }
+
+                        if (!hasCenteredInitial) {
+                            mv.controller.setCenter(geoPoint)
+                            hasCenteredInitial = true
+                        }
+                        mv.invalidate()
+                    },
+                    modifier = Modifier.fillMaxSize()
                 )
 
-                // Concentric range rings
-                val rings = listOf(0.25f, 0.55f, 0.85f, 1.0f)
-                rings.forEach { fraction ->
-                    drawCircle(
-                        color = Color(0xFF6366F1).copy(alpha = 0.18f),
-                        radius = maxRadius * fraction,
-                        center = center,
-                        style = Stroke(width = 1.5f)
+                DisposableEffect(Unit) {
+                    onDispose {
+                        mapViewRef?.onDetach()
+                        mapViewRef = null
+                        markerRef = null
+                        circleRef = null
+                    }
+                }
+
+                // Visible OpenStreetMap Attribution Overlay
+                Surface(
+                    color = Color(0xCC0F172A),
+                    shape = RoundedCornerShape(bottomStart = 16.dp, topEnd = 6.dp),
+                    modifier = Modifier.align(Alignment.BottomStart)
+                ) {
+                    Text(
+                        text = "© OpenStreetMap contributors",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                        color = TextMuted,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
 
-                // Crosshair axes
-                drawLine(
-                    color = Color.White.copy(alpha = 0.06f),
-                    start = Offset(0f, center.y),
-                    end = Offset(size.width, center.y),
-                    strokeWidth = 1f
-                )
-                drawLine(
-                    color = Color.White.copy(alpha = 0.06f),
-                    start = Offset(center.x, 0f),
-                    end = Offset(center.x, size.height),
-                    strokeWidth = 1f
-                )
+                // Controls row: Zoom In, Zoom Out, and Recenter
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(bottom = 8.dp, end = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    FilledTonalIconButton(
+                        onClick = { mapViewRef?.controller?.zoomIn() },
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = Color(0xFF0F172A).copy(alpha = 0.85f),
+                            contentColor = Color.White
+                        ),
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Zoom In",
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
 
-                if (hasValidCoords) {
-                    // Pulsing dynamic aura ring
-                    val pulseRadius = 24.dp.toPx() + (pulseProgress * 32.dp.toPx())
-                    val pulseAlpha = (1.0f - pulseProgress) * 0.7f
-                    drawCircle(
-                        color = Color(0xFF6366F1).copy(alpha = pulseAlpha),
-                        radius = pulseRadius,
-                        center = center
-                    )
+                    FilledTonalIconButton(
+                        onClick = { mapViewRef?.controller?.zoomOut() },
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = Color(0xFF0F172A).copy(alpha = 0.85f),
+                            contentColor = Color.White
+                        ),
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Remove,
+                            contentDescription = "Zoom Out",
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
 
-                    // Accuracy radius boundary
-                    val accRadius = (accuracyMeters ?: 15f).coerceIn(12f, 80f) * 1.2f
-                    drawCircle(
-                        color = Color(0xFF6366F1).copy(alpha = 0.12f),
-                        radius = accRadius,
-                        center = center
-                    )
-                    drawCircle(
-                        color = Color(0xFF6366F1).copy(alpha = 0.4f),
-                        radius = accRadius,
-                        center = center,
-                        style = Stroke(width = 1.2f)
-                    )
-
-                    // Prominent Circular Core Location Marker
-                    // Outer glow ring
-                    drawCircle(
-                        color = Color(0xFF6366F1).copy(alpha = 0.45f),
-                        radius = 18.dp.toPx(),
-                        center = center
-                    )
-                    // Solid inner circle
-                    drawCircle(
-                        color = Color(0xFF6366F1),
-                        radius = 11.dp.toPx(),
-                        center = center
-                    )
-                    // Crisp white border
-                    drawCircle(
-                        color = Color.White,
-                        radius = 11.dp.toPx(),
-                        center = center,
-                        style = Stroke(width = 3.dp.toPx())
-                    )
-                    // Center white dot
-                    drawCircle(
-                        color = Color.White,
-                        radius = 3.5.dp.toPx(),
-                        center = center
-                    )
+                    FilledTonalIconButton(
+                        onClick = {
+                            mapViewRef?.controller?.animateTo(geoPoint)
+                        },
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = Color(0xFF0F172A).copy(alpha = 0.85f),
+                            contentColor = Color(0xFF6366F1)
+                        ),
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MyLocation,
+                            contentDescription = "Recenter",
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
+            } else {
+                // Fallback / Radar View when Google Maps key is not configured or acquiring coordinates
+                val infiniteTransition = rememberInfiniteTransition(label = "locationPulse")
+                val pulseProgress by infiniteTransition.animateFloat(
+                    initialValue = 0.3f,
+                    targetValue = 1.0f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(2200, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "pulseProgress"
+                )
+
+                // Radar Canvas
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val center = Offset(size.width / 2f, size.height / 2f)
+                    val maxRadius = minOf(size.width, size.height) * 0.44f
+
+                    // Gradient background radial glow
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color(0xFF131B2E), Color(0xFF0B0F19)),
+                            center = center,
+                            radius = maxRadius * 1.5f
+                        )
+                    )
+
+                    // Concentric range rings
+                    val rings = listOf(0.25f, 0.55f, 0.85f, 1.0f)
+                    rings.forEach { fraction ->
+                        drawCircle(
+                            color = Color(0xFF6366F1).copy(alpha = 0.18f),
+                            radius = maxRadius * fraction,
+                            center = center,
+                            style = Stroke(width = 1.5f)
+                        )
+                    }
+
+                    // Crosshair axes
+                    drawLine(
+                        color = Color.White.copy(alpha = 0.06f),
+                        start = Offset(0f, center.y),
+                        end = Offset(size.width, center.y),
+                        strokeWidth = 1f
+                    )
+                    drawLine(
+                        color = Color.White.copy(alpha = 0.06f),
+                        start = Offset(center.x, 0f),
+                        end = Offset(center.x, size.height),
+                        strokeWidth = 1f
+                    )
+
+                    if (hasValidCoords) {
+                        // Pulsing dynamic aura ring
+                        val pulseRadius = 24.dp.toPx() + (pulseProgress * 32.dp.toPx())
+                        val pulseAlpha = (1.0f - pulseProgress) * 0.7f
+                        drawCircle(
+                            color = Color(0xFF6366F1).copy(alpha = pulseAlpha),
+                            radius = pulseRadius,
+                            center = center
+                        )
+
+                        // Accuracy radius boundary
+                        val accRadius = (accuracyMeters ?: 15f).coerceIn(12f, 80f) * 1.2f
+                        drawCircle(
+                            color = Color(0xFF6366F1).copy(alpha = 0.12f),
+                            radius = accRadius,
+                            center = center
+                        )
+                        drawCircle(
+                            color = Color(0xFF6366F1).copy(alpha = 0.4f),
+                            radius = accRadius,
+                            center = center,
+                            style = Stroke(width = 1.2f)
+                        )
+
+                        // Prominent Circular Core Location Marker
+                        drawCircle(
+                            color = Color(0xFF6366F1).copy(alpha = 0.45f),
+                            radius = 18.dp.toPx(),
+                            center = center
+                        )
+                        drawCircle(
+                            color = Color(0xFF6366F1),
+                            radius = 11.dp.toPx(),
+                            center = center
+                        )
+                        drawCircle(
+                            color = Color.White,
+                            radius = 11.dp.toPx(),
+                            center = center,
+                            style = Stroke(width = 3.dp.toPx())
+                        )
+                        drawCircle(
+                            color = Color.White,
+                            radius = 3.5.dp.toPx(),
+                            center = center
+                        )
+                    }
+                }
+
+                Text(
+                    text = "Waiting for initial GPS coordinates from hardware...",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(top = 40.dp)
+                )
             }
 
-            // Top Status Overlay: Fix Type & Status Pill
+            // Top Status Overlay: Fix Type & Status Pill (always rendered on top of Map or Fallback)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -493,43 +649,35 @@ fun LiveLocationMapVisualizer(
                     color = Color(0xFF0F172A).copy(alpha = 0.9f),
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 12.dp)
+                        .padding(bottom = 8.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = Icons.Default.MyLocation,
                             contentDescription = null,
                             tint = Color(0xFF6366F1),
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(13.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(5.dp))
                         Text(
                             text = String.format("%.5f°, %.5f°", latitude, longitude),
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                     }
                 }
-            } else {
-                Text(
-                    text = "Waiting for initial GPS coordinates from hardware...",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(top = 40.dp)
-                )
             }
         }
     }
 }
 
 @Composable
+
 private fun DiagnosticRow(
     label: String,
     status: String,

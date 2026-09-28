@@ -48,6 +48,11 @@ fun SplashScreen(
             return@LaunchedEffect
         }
 
+        // On relaunch with active authenticated session: ensure push token is synced if not yet synced
+        try {
+            appContainer.authRepository.syncStoredPushToken(force = false)
+        } catch (_: Exception) {}
+
         // Check backend authoritative pairing status with Room fallback
         val pairingResult = appContainer.pairingRepository.getPairingStatus()
         val isPaired = when (pairingResult) {

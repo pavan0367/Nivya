@@ -36,6 +36,9 @@ open class AuthRepository(
                     storage.saveTokens(authData.accessToken, authData.refreshToken)
                     storage.saveUserRole(authData.user.role)
                     prefs.saveSelectedRole(authData.user.role)
+                    try {
+                        syncStoredPushToken(force = true)
+                    } catch (_: Exception) {}
                     NetworkResult.Success(authData)
                 } else {
                     val errorMsg = response.body()?.message
@@ -212,15 +215,39 @@ open class AuthRepository(
                         deviceName = android.os.Build.MODEL
                     )
                 )
+                android.util.Log.i("AuthRepo", "Register push token response: code=${response.code()} success=${response.body()?.success}")
                 if (response.isSuccessful && response.body()?.data != null) {
+                    preferencesDataStore?.saveLastSyncedFcmToken(token)
                     NetworkResult.Success(response.body()!!.data!!)
                 } else {
                     NetworkResult.Error(code = response.code(), message = response.message())
                 }
             } catch (e: Exception) {
+                android.util.Log.w("AuthRepo", "Register push token failed: ${e.message}")
                 NetworkResult.Exception(e)
             }
         }
+    }
+
+    open suspend fun syncStoredPushToken(force: Boolean = false): NetworkResult<PushTokenResponseDto>? {
+        if (!isLoggedIn()) {
+            android.util.Log.i("AuthRepo", "syncStoredPushToken: not logged in")
+            return null
+        }
+        val token = preferencesDataStore?.getFcmToken()
+        if (token.isNullOrBlank()) {
+            android.util.Log.i("AuthRepo", "syncStoredPushToken: stored token is null or blank")
+            return null
+        }
+        if (!force) {
+            val lastSynced = preferencesDataStore?.getLastSyncedFcmToken()
+            if (token == lastSynced) {
+                android.util.Log.i("AuthRepo", "syncStoredPushToken: token already synced (${token.take(8)}...)")
+                return null
+            }
+        }
+        android.util.Log.i("AuthRepo", "syncStoredPushToken: synchronizing token (${token.take(8)}...)")
+        return syncPushToken(token)
     }
 
     open fun isLoggedIn(): Boolean {

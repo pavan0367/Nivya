@@ -9,9 +9,11 @@ import com.nivya.core.network.NetworkResult
 import com.nivya.core.network.NivyaApiService
 import com.nivya.core.network.dto.*
 import com.nivya.core.security.SecureTokenStorage
+import com.nivya.core.security.TokenStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
+import com.nivya.data.local.UserPreferencesDataStore
 import kotlinx.coroutines.withContext
 
 /**
@@ -20,24 +22,28 @@ import kotlinx.coroutines.withContext
  */
 class PairingRepository(
     private val apiService: NivyaApiService,
-    private val tokenStorage: SecureTokenStorage,
-    private val database: NivyaDatabase,
-    private val networkMonitor: NetworkMonitor
+    private val tokenStorage: TokenStorage,
+    private val database: NivyaDatabase? = null,
+    private val networkMonitor: NetworkMonitor? = null,
+    private val preferencesDataStore: UserPreferencesDataStore? = null,
+    private val authRepository: AuthRepository? = null
 ) {
 
-    private val familyDao = database.familyDao()
-    private val deviceStatusDao = database.deviceStatusDao()
+    private val familyDao = database?.familyDao()
+    private val deviceStatusDao = database?.deviceStatusDao()
 
-    fun getCachedFamily(): Flow<FamilyEntity?> = familyDao.getFamilyFlow()
-    fun getCachedDevices(): Flow<List<DeviceStatusEntity>> = deviceStatusDao.getDevicesFlow()
+    fun getCachedFamily(): Flow<FamilyEntity?> = familyDao?.getFamilyFlow() ?: kotlinx.coroutines.flow.flowOf(null)
+    fun getCachedDevices(): Flow<List<DeviceStatusEntity>> = deviceStatusDao?.getDevicesFlow() ?: kotlinx.coroutines.flow.flowOf(emptyList())
 
-    private fun buildDeviceInfo(): DeviceInfoDto {
+    private suspend fun buildDeviceInfo(): DeviceInfoDto {
+        val fcmToken = preferencesDataStore?.getFcmToken()
         return DeviceInfoDto(
             deviceUuid = tokenStorage.getDeviceUuid(),
             deviceName = "${Build.MANUFACTURER} ${Build.MODEL}",
             platform = "ANDROID",
             osVersion = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
-            appVersion = "1.0.0"
+            appVersion = "1.0.0",
+            pushToken = fcmToken
         )
     }
 
@@ -73,6 +79,9 @@ class PairingRepository(
                 if (response.isSuccessful && response.body()?.data != null) {
                     val status = response.body()!!.data!!
                     cachePairingStatus(status)
+                    try {
+                        authRepository?.syncStoredPushToken(force = true)
+                    } catch (_: Exception) {}
                     NetworkResult.Success(status)
                 } else {
                     val msg = response.body()?.message
@@ -88,7 +97,7 @@ class PairingRepository(
 
     suspend fun getPairingStatus(): NetworkResult<PairingStatusResponseDto> {
         return withContext(Dispatchers.IO) {
-            val isOnline = networkMonitor.isOnline.value
+            val isOnline = networkMonitor?.isOnline?.value ?: true
             if (isOnline) {
                 try {
                     val response = apiService.getPairingStatus()
@@ -103,9 +112,9 @@ class PairingRepository(
             }
 
             // Offline fallback: load from Room database
-            val cachedFamily = familyDao.getFamily()
+            val cachedFamily = familyDao?.getFamily()
             if (cachedFamily != null) {
-                val cachedDevices = deviceStatusDao.getDevicesFlow().firstOrNull() ?: emptyList()
+                val cachedDevices = deviceStatusDao?.getDevicesFlow()?.firstOrNull() ?: emptyList()
                 val offlineStatus = PairingStatusResponseDto(
                     paired = cachedFamily.isPaired,
                     familyId = cachedFamily.familyId,
@@ -138,7 +147,7 @@ class PairingRepository(
 
     private suspend fun cachePairingStatus(status: PairingStatusResponseDto) {
         if (status.paired && status.familyId != null) {
-            familyDao.insertFamily(
+            familyDao?.insertFamily(
                 FamilyEntity(
                     familyId = status.familyId,
                     familyCode = status.familyCode ?: "",
@@ -163,7 +172,7 @@ class PairingRepository(
                     isStale = d.isStale
                 )
             }
-            deviceStatusDao.insertDevices(deviceEntities)
+            deviceStatusDao?.insertDevices(deviceEntities)
         }
     }
 
@@ -205,8 +214,8 @@ class PairingRepository(
                 val response = apiService.verifyDisconnectCode(VerifyDisconnectCodeRequestDto(code.trim().uppercase()))
                 if (response.isSuccessful) {
                     // Intentional disconnect: clear local persistent cache
-                    familyDao.clearFamily()
-                    deviceStatusDao.clearDevices()
+                    familyDao?.clearFamily()
+                    deviceStatusDao?.clearDevices()
                     NetworkResult.Success(Unit)
                 } else {
                     val msg = response.body()?.message ?: "Invalid or expired disconnect code"

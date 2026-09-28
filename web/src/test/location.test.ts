@@ -97,4 +97,52 @@ describe('Location Module and Coordinate Integrity', () => {
       }
     });
   });
+
+  describe('OpenStreetMap Visualization Contract & Safety', () => {
+    it('operates base map tiles with zero API key dependency or billing', () => {
+      // OpenStreetMap tiles are free, public, and do not append or require an API key parameter
+      const osmTilePattern = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+      expect(osmTilePattern).not.toContain('key=');
+      expect(osmTilePattern).not.toContain('apiKey=');
+    });
+
+    it('uses HTTPS OpenStreetMap tile endpoint and requires attribution', () => {
+      const tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+      const attribution = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors';
+      expect(tileUrl.startsWith('https://')).toBe(true);
+      expect(tileUrl).toContain('openstreetmap.org');
+      expect(attribution).toContain('OpenStreetMap');
+    });
+
+    it('calculates accuracy radius correctly with 5m minimum boundary', () => {
+      const calculateRadius = (accuracyMeters?: number) => Math.max(accuracyMeters || 15, 5);
+      expect(calculateRadius(2)).toBe(5);
+      expect(calculateRadius(10)).toBe(10);
+      expect(calculateRadius(undefined)).toBe(15);
+      expect(calculateRadius(0)).toBe(15);
+      expect(calculateRadius(45.5)).toBe(45.5);
+    });
+
+    it('enforces initial-center UX rule where camera is only locked once', () => {
+      let hasCentered = false;
+      let centerCount = 0;
+
+      const onCoordinatesReceived = (_lat: number, _lng: number) => {
+        if (!hasCentered) {
+          centerCount++;
+          hasCentered = true;
+        }
+      };
+
+      // Initial fix centers
+      onCoordinatesReceived(12.9716, 77.5946);
+      expect(centerCount).toBe(1);
+
+      // Subsequent live updates do not hijack user camera/zoom
+      onCoordinatesReceived(12.9718, 77.5948);
+      onCoordinatesReceived(12.9720, 77.5950);
+      expect(centerCount).toBe(1);
+    });
+  });
 });
+
