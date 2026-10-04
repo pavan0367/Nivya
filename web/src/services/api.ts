@@ -29,6 +29,10 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
+    // Respect user/component aborted requests without triggering logout or auth errors
+    if (axios.isCancel(error)) {
+      return Promise.reject(error);
+    }
     if (error.response?.status === 401) {
       // Clear all authentication & session tokens, trigger redirect to login
       localStorage.removeItem('nivya_access_token');

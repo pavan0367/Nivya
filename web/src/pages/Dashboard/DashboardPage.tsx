@@ -101,13 +101,15 @@ export const DashboardPage: React.FC = () => {
     setError(null);
 
     try {
-      const [batRes, batHistRes, netRes, locRes, usageRes, healthRes] = await Promise.allSettled([
+      // Parallel dispatch of all independent telemetry and alerts in a single round-trip
+      const [batRes, batHistRes, netRes, locRes, usageRes, healthRes, alertsRes] = await Promise.allSettled([
         telemetryService.getBatteryStatus(activeDeviceId),
         telemetryService.getBatteryHistory(activeDeviceId),
         telemetryService.getNetworkStatus(activeDeviceId),
         telemetryService.getLocationCurrent(activeDeviceId),
         telemetryService.getUsageSummary(activeDeviceId),
         telemetryService.getDeviceHealth(activeDeviceId),
+        alertService.getChildAlerts(),
       ]);
 
       if (batRes.status === 'fulfilled' && batRes.value) {
@@ -146,11 +148,9 @@ export const DashboardPage: React.FC = () => {
         setHealth(null);
       }
 
-      // Fetch child/family alerts
-      try {
-        const alertsList = await alertService.getChildAlerts();
-        setRecentAlerts(alertsList.slice(0, 3));
-      } catch {
+      if (alertsRes.status === 'fulfilled' && alertsRes.value && Array.isArray(alertsRes.value)) {
+        setRecentAlerts(alertsRes.value.slice(0, 3));
+      } else {
         setRecentAlerts([]);
       }
     } catch (err: any) {

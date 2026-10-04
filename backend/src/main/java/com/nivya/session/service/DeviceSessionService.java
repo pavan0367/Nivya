@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Qualifier;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,18 +30,21 @@ public class DeviceSessionService {
     private final EmailService emailService;
     private final AuditService auditService;
     private final UserRepository userRepository;
+    private final Executor taskExecutor;
 
     public DeviceSessionService(
             DeviceSessionRepository sessionRepository,
             RefreshTokenRepository refreshTokenRepository,
             EmailService emailService,
             AuditService auditService,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            @Qualifier("taskExecutor") Executor taskExecutor) {
         this.sessionRepository = sessionRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.emailService = emailService;
         this.auditService = auditService;
         this.userRepository = userRepository;
+        this.taskExecutor = taskExecutor;
     }
 
     @Transactional
@@ -76,12 +81,16 @@ public class DeviceSessionService {
                 "Session created on " + (platform != null ? platform : "UNKNOWN") + " (" + (deviceName != null ? deviceName : "Device") + ")",
                 ipAddress);
 
-        // Dispatches asynchronously without blocking login, strictly after transaction commits
+        // Dispatches asynchronously without blocking login, strictly after transaction commits on dedicated background thread pool
         Runnable dispatchLoginAlerts = () -> {
-            if (isNewDevice) {
-                emailService.sendNewDeviceLoginNotificationAsync(user, deviceName, platform, osVersion, appVersion, ipAddress, approxLocation);
+            try {
+                if (isNewDevice) {
+                    emailService.sendNewDeviceLoginNotificationAsync(user, deviceName, platform, osVersion, appVersion, ipAddress, approxLocation);
+                }
+                emailService.sendLoginNotificationAsync(user, deviceName, platform, osVersion, appVersion, ipAddress, approxLocation);
+            } catch (Exception e) {
+                log.warn("Non-blocking login alert error for {}: {}", user.getEmail(), e.getMessage());
             }
-            emailService.sendLoginNotificationAsync(user, deviceName, platform, osVersion, appVersion, ipAddress, approxLocation);
         };
 
         if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
@@ -89,12 +98,12 @@ public class DeviceSessionService {
                     new org.springframework.transaction.support.TransactionSynchronization() {
                         @Override
                         public void afterCommit() {
-                            dispatchLoginAlerts.run();
+                            taskExecutor.execute(dispatchLoginAlerts);
                         }
                     }
             );
         } else {
-            dispatchLoginAlerts.run();
+            taskExecutor.execute(dispatchLoginAlerts);
         }
 
         return session;
@@ -112,19 +121,26 @@ public class DeviceSessionService {
                     });
         }
 
-        // Send non-blocking logout email strictly after transaction commits
-        Runnable dispatchLogout = () -> emailService.sendLogoutNotificationAsync(user, ipAddress);
+        // Send non-blocking logout email strictly after transaction commits on dedicated background pool
+        Runnable dispatchLogout = () -> {
+            try {
+                emailService.sendLogoutNotificationAsync(user, ipAddress);
+            } catch (Exception e) {
+                log.warn("Non-blocking logout alert error for {}: {}", user.getEmail(), e.getMessage());
+            }
+        };
+
         if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
             org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
                     new org.springframework.transaction.support.TransactionSynchronization() {
                         @Override
                         public void afterCommit() {
-                            dispatchLogout.run();
+                            taskExecutor.execute(dispatchLogout);
                         }
                     }
             );
         } else {
-            dispatchLogout.run();
+            taskExecutor.execute(dispatchLogout);
         }
     }
 

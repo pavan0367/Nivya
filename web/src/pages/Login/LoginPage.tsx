@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { Lock, Mail, ArrowRight, AlertCircle, CheckCircle } from 'lucide-react';
+import { Lock, Mail, ArrowRight, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { authService } from '../../services/authService';
 
 export const LoginPage: React.FC = () => {
@@ -24,7 +24,10 @@ export const LoginPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
+    if (loading) return; // Prevent duplicate concurrent submissions
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
       setError('Please enter both email and password.');
       return;
     }
@@ -34,42 +37,56 @@ export const LoginPage: React.FC = () => {
     setUnverifiedEmail(null);
 
     try {
-      const data = await authService.login(email, password);
+      const data = await authService.login(trimmedEmail, password);
       const userRole = data.user.role;
 
+      // Update pairing status asynchronously in background without blocking navigation
+      authService.getPairingStatus().catch((pairErr) => {
+        console.debug('Background pairing status update:', pairErr);
+      });
+
+      // Role-specific navigation executes immediately with zero blocking
       if (userRole === 'ADMIN') {
         navigate('/admin', { replace: true });
         return;
       }
 
-      // Check server-authoritative pairing status to differentiate paired vs setup-incomplete
-      let isPaired = false;
-      try {
-        const pairingStatus = await authService.getPairingStatus();
-        isPaired = pairingStatus.paired;
-      } catch (pairErr) {
-        console.warn('Could not determine live pairing status; checking local state:', pairErr);
-        isPaired = authService.isPaired();
-      }
-
       if (userRole === 'CHILD') {
-        // Child enters role-specific app (/child) even when not yet paired
         navigate('/child', { replace: true });
         return;
       }
 
-      // PARENT LOGIN: Enter role-specific dashboard (/dashboard) even when not yet paired
+      // PARENT LOGIN: Enter role-specific dashboard (/dashboard) immediately
       const origin = (location.state as any)?.from?.pathname;
       const target = (origin && origin !== '/access-denied' && !origin.startsWith('/child') && origin !== '/pairing') ? origin : '/dashboard';
       navigate(target, { replace: true });
     } catch (err: any) {
       console.error('Login failed:', err);
-      const serverMsg = err.response?.data?.message ||
-        'Authentication failed. Please check your credentials and try again.';
-      setError(serverMsg);
 
-      if (serverMsg.toLowerCase().includes('not verified') || serverMsg.toLowerCase().includes('verify your email')) {
-        setUnverifiedEmail(email.trim().toLowerCase());
+      // Explicit error differentiation based on real root cause
+      if (err.code === 'ECONNABORTED' || err.message?.toLowerCase().includes('timeout')) {
+        setError('Server response timed out. The backend is busy or experiencing high latency. Please retry in a moment.');
+      } else if (!err.response && (err.message?.toLowerCase().includes('network') || !navigator.onLine)) {
+        setError('Network connection error. Unable to reach Nivya servers. Please verify your internet connection.');
+      } else if (err.response?.status === 401) {
+        const msg = err.response?.data?.message || 'Invalid email or password. Please check your credentials.';
+        setError(msg);
+        if (msg.toLowerCase().includes('not verified') || msg.toLowerCase().includes('verify your email')) {
+          setUnverifiedEmail(trimmedEmail.toLowerCase());
+        }
+      } else if (err.response?.status === 429) {
+        setError('Too many failed login attempts. Please wait 15 minutes before trying again.');
+      } else if (err.response?.status === 502 || err.response?.status === 503 || err.response?.status === 504) {
+        setError('Nivya server is temporarily unavailable or warming up. Please retry in a few seconds.');
+      } else if (err.response?.status >= 500) {
+        setError('A server error occurred while processing your request. Please try again shortly.');
+      } else {
+        const fallbackMsg = err.response?.data?.message ||
+          'Authentication failed. Please check your credentials and try again.';
+        setError(fallbackMsg);
+        if (fallbackMsg.toLowerCase().includes('not verified') || fallbackMsg.toLowerCase().includes('verify your email')) {
+          setUnverifiedEmail(trimmedEmail.toLowerCase());
+        }
       }
     } finally {
       setLoading(false);
@@ -139,7 +156,7 @@ export const LoginPage: React.FC = () => {
                 id="link-verify-unverified"
                 style={{ color: '#fff', fontWeight: 600, textDecoration: 'underline', fontSize: '0.82rem' }}
               >
-                Click here to verify your email address →
+                Click here to verify your email address &rarr;
               </Link>
             )}
           </div>
@@ -168,6 +185,7 @@ export const LoginPage: React.FC = () => {
               placeholder="user@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              disabled={loading}
               required
             />
           </div>
@@ -194,6 +212,7 @@ export const LoginPage: React.FC = () => {
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              disabled={loading}
               required
             />
           </div>
@@ -204,13 +223,26 @@ export const LoginPage: React.FC = () => {
           id="btn-login-submit"
           className="btn btn-primary"
           disabled={loading}
-          style={{ width: '100%', marginTop: '0.5rem', padding: '0.75rem' }}
+          style={{
+            width: '100%',
+            marginTop: '0.5rem',
+            padding: '0.75rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            opacity: loading ? 0.75 : 1,
+            cursor: loading ? 'not-allowed' : 'pointer',
+          }}
         >
           {loading ? (
-            'Authenticating...'
+            <>
+              <Loader2 size={17} style={{ animation: 'spin 0.9s linear infinite' }} />
+              <span>Authenticating...</span>
+            </>
           ) : (
             <>
-              Sign In to Console
+              <span>Sign In to Console</span>
               <ArrowRight size={17} />
             </>
           )}
