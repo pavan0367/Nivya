@@ -59,6 +59,10 @@ export const adminService = {
     return response.data.data!;
   },
 
+  async deleteUser(id: number): Promise<void> {
+    await apiClient.delete<ApiResponse<{ message: string }>>(`/admin/users/${id}`);
+  },
+
   async getAuditLogs(params: {
     page?: number;
     size?: number;

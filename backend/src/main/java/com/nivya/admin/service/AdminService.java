@@ -51,6 +51,7 @@ public class AdminService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final AuditLogRepository auditLogRepository;
     private final AuditService auditService;
+    private final com.nivya.user.service.AccountDeletionService accountDeletionService;
 
     public AdminService(UserRepository userRepository,
                         DeviceRepository deviceRepository,
@@ -58,7 +59,8 @@ public class AdminService {
                         FamilyRepository familyRepository,
                         RefreshTokenRepository refreshTokenRepository,
                         AuditLogRepository auditLogRepository,
-                        AuditService auditService) {
+                        AuditService auditService,
+                        com.nivya.user.service.AccountDeletionService accountDeletionService) {
         this.userRepository = userRepository;
         this.deviceRepository = deviceRepository;
         this.familyMemberRepository = familyMemberRepository;
@@ -66,6 +68,7 @@ public class AdminService {
         this.refreshTokenRepository = refreshTokenRepository;
         this.auditLogRepository = auditLogRepository;
         this.auditService = auditService;
+        this.accountDeletionService = accountDeletionService;
     }
 
     /**
@@ -340,5 +343,40 @@ public class AdminService {
                 throw new IllegalStateException("Cannot disable the final active administrator");
             }
         }
+    }
+
+    /**
+     * Permanently and irreversibly deletes a user account and cascades data removal (Admin only).
+     * Prohibits self-deletion and deleting the final active administrator.
+     */
+    @Transactional
+    public void deleteUser(Long userId, UserPrincipal currentAdmin, String ipAddress) {
+        User targetUser = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+
+        if (targetUser.getId().equals(currentAdmin.getId())) {
+            auditService.logAdminEvent(currentAdmin.getId(), targetUser.getId(), "ADMIN_ACTION_DENIED",
+                    "Administrator attempted to delete their own account", ipAddress);
+            throw new IllegalArgumentException("Administrators cannot delete their own account");
+        }
+
+        if (targetUser.getRole() == RoleType.ADMIN) {
+            long activeAdmins = userRepository.countByRoleAndStatus(RoleType.ADMIN, UserStatus.ACTIVE);
+            if (activeAdmins <= 1) {
+                auditService.logAdminEvent(currentAdmin.getId(), targetUser.getId(), "ADMIN_ACTION_DENIED",
+                        "Attempted to delete the final active administrator", ipAddress);
+                throw new IllegalStateException("Cannot delete the final active administrator");
+            }
+        }
+
+        String userEmail = targetUser.getEmail();
+        RoleType role = targetUser.getRole();
+
+        // Perform full cascade deletion via AccountDeletionService
+        accountDeletionService.executeAdminAccountDeletion(targetUser, currentAdmin, ipAddress);
+
+        auditService.logAdminEvent(currentAdmin.getId(), null, "ADMIN_USER_DELETE",
+                "Permanently deleted user ID: " + userId + ", email: " + userEmail + ", role: " + role, ipAddress);
+        log.info("Admin {} permanently deleted user ID {}, email: {}", currentAdmin.getEmail(), userId, userEmail);
     }
 }

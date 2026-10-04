@@ -24,16 +24,9 @@ export const RoleSelectPage: React.FC = () => {
       }
 
       if (selectedRole === 'PARENT') {
-        navigate('/pairing');
+        navigate('/dashboard');
       } else {
-        let isPaired = false;
-        try {
-          const pairingStatus = await authService.getPairingStatus();
-          isPaired = pairingStatus.paired;
-        } catch {
-          isPaired = authService.isPaired();
-        }
-        navigate(authService.getPostAuthDestination('CHILD', isPaired));
+        navigate('/child');
       }
     } finally {
       setLoading(false);

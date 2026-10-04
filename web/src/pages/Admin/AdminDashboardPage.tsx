@@ -21,7 +21,8 @@ import {
   ChevronRight,
   X,
   Save,
-  Activity
+  Activity,
+  Trash2
 } from 'lucide-react';
 import { adminService } from '../../services/adminService';
 import {
@@ -74,6 +75,11 @@ export const AdminDashboardPage: React.FC = () => {
   const [targetNewStatus, setTargetNewStatus] = useState<UserStatus>('DISABLED');
   const [statusSaving, setStatusSaving] = useState<boolean>(false);
   const [statusError, setStatusError] = useState<string | null>(null);
+
+  // Permanent Delete Modal state
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState<AdminUserSummary | null>(null);
+  const [deleteSaving, setDeleteSaving] = useState<boolean>(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Audit Logs state
   const [auditLogsData, setAuditLogsData] = useState<PaginatedData<AdminAuditLog> | null>(null);
@@ -262,6 +268,34 @@ export const AdminDashboardPage: React.FC = () => {
       setStatusError(err.response?.data?.message || 'Failed to update account status');
     } finally {
       setStatusSaving(false);
+    }
+  };
+
+  // Start Permanent Deletion
+  const handleStartDelete = (user: AdminUserSummary) => {
+    setDeleteConfirmUser(user);
+    setDeleteError(null);
+  };
+
+  // Confirm Permanent Deletion
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirmUser) return;
+    setDeleteSaving(true);
+    setDeleteError(null);
+    try {
+      await adminService.deleteUser(deleteConfirmUser.id);
+      showNotice(`Account ${deleteConfirmUser.email} permanently deleted`, 'success');
+      if (selectedUser?.id === deleteConfirmUser.id) {
+        setSelectedUser(null);
+      }
+      setDeleteConfirmUser(null);
+      loadUsers();
+      loadStats();
+      loadAuditLogs();
+    } catch (err: any) {
+      setDeleteError(err.response?.data?.message || 'Failed to permanently delete user');
+    } finally {
+      setDeleteSaving(false);
     }
   };
 
@@ -671,6 +705,19 @@ export const AdminDashboardPage: React.FC = () => {
                                 <UserCheck size={14} />
                               </button>
                             )}
+
+                            {/* Permanent Delete Action */}
+                            <button
+                              type="button"
+                              id={`btn-delete-user-${user.id}`}
+                              className="btn btn-secondary btn-sm"
+                              title={isSelf ? 'Cannot delete own account' : 'Permanently delete account'}
+                              disabled={isSelf}
+                              style={{ padding: '0.35rem 0.55rem', color: isSelf ? 'var(--text-dim)' : '#ef4444', opacity: isSelf ? 0.4 : 1 }}
+                              onClick={() => handleStartDelete(user)}
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1169,6 +1216,70 @@ export const AdminDashboardPage: React.FC = () => {
                 disabled={statusSaving}
               >
                 {statusSaving ? <RefreshCw size={14} className="spin" /> : `Confirm ${targetNewStatus}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: PERMANENT USER DELETE CONFIRMATION MODAL */}
+      {deleteConfirmUser && (
+        <div className="modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="card" style={{ maxWidth: '480px', width: '100%', padding: '1.75rem', position: 'relative', border: '1px solid rgba(239, 68, 68, 0.4)' }}>
+            <button
+              type="button"
+              id="btn-close-delete-modal"
+              className="btn btn-secondary btn-sm"
+              style={{ position: 'absolute', right: '1.25rem', top: '1.25rem', padding: '0.4rem' }}
+              onClick={() => setDeleteConfirmUser(null)}
+            >
+              <X size={16} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+              <Trash2 size={24} color="#ef4444" />
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#fff' }}>
+                Permanently Delete User Account
+              </h2>
+            </div>
+
+            <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: 'var(--radius-sm)', padding: '0.85rem', marginBottom: '1rem' }}>
+              <p style={{ color: '#fca5a5', fontSize: '0.875rem', margin: 0, fontWeight: 500 }}>
+                This permanently deletes the account and its associated data. The action cannot be undone.
+              </p>
+            </div>
+
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+              Are you sure you want to permanently delete <strong>{deleteConfirmUser.name}</strong> ({deleteConfirmUser.email}, role: <strong>{deleteConfirmUser.role}</strong>)?
+              <span style={{ display: 'block', marginTop: '0.5rem', color: 'var(--text-dim)', fontSize: '0.8rem' }}>
+                Notice: All active sessions, refresh tokens, enrolled devices, pairing relationships, and approval records will be removed. The email address will immediately become available for fresh registration.
+              </span>
+            </p>
+
+            {deleteError && (
+              <div className="badge badge-danger" style={{ padding: '0.65rem 1rem', width: '100%', marginBottom: '1rem', borderRadius: 'var(--radius-sm)' }}>
+                {deleteError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                id="btn-cancel-delete-user"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setDeleteConfirmUser(null)}
+                disabled={deleteSaving}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                id="btn-confirm-delete-user"
+                className="btn btn-danger btn-sm"
+                onClick={handleConfirmDelete}
+                disabled={deleteSaving}
+              >
+                {deleteSaving ? <RefreshCw size={14} className="spin" /> : 'Permanently Delete Account'}
               </button>
             </div>
           </div>

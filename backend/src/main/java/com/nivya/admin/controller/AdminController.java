@@ -107,6 +107,19 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success(summary, "User role updated successfully"));
     }
 
+    @DeleteMapping("/users/{id}")
+    @Operation(summary = "Permanently Delete User", description = "Permanently and irreversibly deletes a user account and cascades data removal")
+    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> deleteUser(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest request) {
+        adminService.deleteUser(id, principal, getClientIp(request));
+        return ResponseEntity.ok(ApiResponse.success(
+                java.util.Map.of("message", "User account and associated data permanently deleted"),
+                "User permanently deleted successfully"
+        ));
+    }
+
     @GetMapping("/audit-logs")
     @Operation(summary = "List Audit Logs", description = "Retrieves paginated administrative audit logs")
     public ResponseEntity<ApiResponse<Page<AdminAuditLogDto>>> listAuditLogs(

@@ -233,16 +233,20 @@ export const DashboardPage: React.FC = () => {
     return (
       <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
         <Smartphone size={48} color="var(--text-dim)" style={{ marginBottom: '1rem' }} />
-        <h3>No Child Device Enrolled</h3>
-        <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-          Pair a child device in Settings to monitor real-time telemetry and safety status.
+        <div style={{ marginBottom: '0.75rem' }}>
+          <span className="badge badge-warning">NOT CONNECTED / NOT PAIRED</span>
+        </div>
+        <h3 style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 600 }}>No Child Device Connected</h3>
+        <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', maxWidth: '480px', margin: '0.5rem auto 0' }}>
+          Your parent account is authenticated but not yet paired with a companion child device. Generate your pairing code or enter your child's code to link devices.
         </p>
         <button
+          id="btn-dashboard-pair-now"
           className="btn btn-primary"
           style={{ marginTop: '1.25rem' }}
-          onClick={() => navigate('/settings')}
+          onClick={() => navigate('/pairing')}
         >
-          Go to Device Settings
+          Pair Child Device
         </button>
       </div>
     );

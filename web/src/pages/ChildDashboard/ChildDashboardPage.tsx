@@ -21,7 +21,7 @@ import { ChildOutletContext } from '../../layouts/ChildLayout';
 
 export const ChildDashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { activeDeviceId } = useOutletContext<ChildOutletContext>();
+  const { activeDeviceId, isPaired } = useOutletContext<ChildOutletContext>();
 
   // Delayed Visual States — "Sending..." is exception-only (shown only after grace period)
   const [showCrackSending, setShowCrackSending] = useState(false);
@@ -167,6 +167,38 @@ export const ChildDashboardPage: React.FC = () => {
         >
           <AlertTriangle size={16} />
           <span>{errorMessage}</span>
+        </div>
+      )}
+
+      {!isPaired && (
+        <div
+          id="child-unpaired-banner"
+          style={{
+            padding: '1rem',
+            background: 'rgba(245, 158, 11, 0.12)',
+            border: '1px solid rgba(245, 158, 11, 0.35)',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.75rem',
+          }}
+        >
+          <div>
+            <div style={{ fontWeight: 600, color: '#FBBF24', fontSize: '0.9rem' }}>NOT CONNECTED / NOT PAIRED</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+              Your device is not paired with a parent. Generate your pairing code or enter your parent's code.
+            </div>
+          </div>
+          <button
+            type="button"
+            id="btn-child-pair-now"
+            className="btn btn-primary btn-sm"
+            onClick={() => navigate('/pairing')}
+            style={{ whiteSpace: 'nowrap' }}
+          >
+            Pair Device
+          </button>
         </div>
       )}
 

@@ -12,6 +12,7 @@ import com.nivya.family.entity.FamilyMember;
 import com.nivya.family.repository.FamilyMemberRepository;
 import com.nivya.family.repository.FamilyRepository;
 import com.nivya.role.RoleType;
+import com.nivya.security.UserPrincipal;
 import com.nivya.user.dto.AccountDeletionStatusDto;
 import com.nivya.user.dto.DeleteAccountRequest;
 import com.nivya.user.dto.RequestChildApprovalResponse;
@@ -56,6 +57,7 @@ public class AccountDeletionService {
     private final com.nivya.pairing.repository.PairingRequestRepository pairingRequestRepository;
     private final com.nivya.consent.repository.ConsentRepository consentRepository;
     private final com.nivya.convocation.repository.ConvocationMessageRepository convocationMessageRepository;
+    private final com.nivya.pairing.repository.DisconnectCodeRepository disconnectCodeRepository;
     private final com.nivya.email.service.EmailService emailService;
     private final EmailProviderFactory emailProviderFactory;
     private final PasswordEncoder passwordEncoder;
@@ -75,6 +77,7 @@ public class AccountDeletionService {
             com.nivya.pairing.repository.PairingRequestRepository pairingRequestRepository,
             com.nivya.consent.repository.ConsentRepository consentRepository,
             com.nivya.convocation.repository.ConvocationMessageRepository convocationMessageRepository,
+            com.nivya.pairing.repository.DisconnectCodeRepository disconnectCodeRepository,
             com.nivya.email.service.EmailService emailService,
             EmailProviderFactory emailProviderFactory,
             PasswordEncoder passwordEncoder,
@@ -92,6 +95,7 @@ public class AccountDeletionService {
         this.pairingRequestRepository = pairingRequestRepository;
         this.consentRepository = consentRepository;
         this.convocationMessageRepository = convocationMessageRepository;
+        this.disconnectCodeRepository = disconnectCodeRepository;
         this.emailService = emailService;
         this.emailProviderFactory = emailProviderFactory;
         this.passwordEncoder = passwordEncoder;
@@ -101,6 +105,16 @@ public class AccountDeletionService {
 
     @Transactional(readOnly = true)
     public AccountDeletionStatusDto getDeletionStatus(User user) {
+        if (user.getRole() == RoleType.ADMIN) {
+            return new AccountDeletionStatusDto(
+                    RoleType.ADMIN,
+                    false,
+                    false,
+                    null,
+                    "Administrator account cannot be deleted via standard user deletion."
+            );
+        }
+
         if (user.getRole() == RoleType.PARENT) {
             return new AccountDeletionStatusDto(
                     RoleType.PARENT,
@@ -163,7 +177,14 @@ public class AccountDeletionService {
             throw new IllegalArgumentException("Only child accounts can request parent deletion approval.");
         }
 
-        // 1. Short transaction to find parent, revoke previous codes, generate new code, and log audit event
+        // Validate child is connected to a parent before starting transaction
+        Optional<User> parentOpt = findConnectedParent(child.getId());
+        if (parentOpt.isEmpty()) {
+            throw new IllegalStateException("Child account is not currently connected to a parent. Deletion requires password verification instead of parent approval.");
+        }
+        User parent = parentOpt.get();
+
+        // 1. Short transaction to revoke previous codes, generate new code, and log audit event
         record ChildApprovalContext(
                 Long codeRecordId,
                 String rawCode,
@@ -175,9 +196,6 @@ public class AccountDeletionService {
         ) {}
 
         ChildApprovalContext ctx = transactionTemplate.execute(status -> {
-            User parent = findConnectedParent(child.getId())
-                    .orElseThrow(() -> new IllegalStateException("Child account is not connected to a parent. Cannot request parent approval."));
-
             User childUser = userRepository.findById(child.getId()).orElse(child);
 
             // Invalidate any previously pending or dispatching codes for this child
@@ -434,6 +452,7 @@ public class AccountDeletionService {
         }
 
         // Clean up user records in dependent tables to ensure referential integrity
+        disconnectCodeRepository.deleteAllByUserId(userId);
         approvalCodeRepository.deleteAllByChildUserIdOrParentUserId(userId);
         refreshTokenRepository.deleteAllByUserId(userId);
         emailVerificationCodeRepository.deleteAllByUserIdOrEmail(userId, userEmail);
@@ -489,9 +508,133 @@ public class AccountDeletionService {
         }
     }
 
+    @Transactional
+    public void executeAdminAccountDeletion(User targetUser, UserPrincipal currentAdmin, String ipAddress) {
+        Long userId = targetUser.getId();
+        RoleType role = targetUser.getRole();
+        String userEmail = targetUser.getEmail();
+        String userName = targetUser.getName();
+
+        log.info("Admin {} executing permanent account deletion for user ID: {}, email: {}, role: {}",
+                currentAdmin.getEmail(), userId, userEmail, role);
+
+        // 1. Revoke all tokens
+        refreshTokenRepository.revokeAllUserTokens(userId, Instant.now());
+
+        // 2. Handle family memberships cleanly without deleting other family members
+        List<FamilyMember> userMembers = familyMemberRepository.findAllByUserId(userId);
+        for (FamilyMember currentMember : userMembers) {
+            if (currentMember.getFamily() != null) {
+                Long familyId = currentMember.getFamily().getId();
+                List<FamilyMember> allMembers = familyMemberRepository.findByFamilyId(familyId);
+                Optional<Family> familyOpt = familyRepository.findById(familyId);
+
+                if (familyOpt.isPresent()) {
+                    Family family = familyOpt.get();
+                    List<FamilyMember> remainingMembers = allMembers.stream()
+                            .filter(m -> !m.getUser().getId().equals(userId))
+                            .toList();
+
+                    if (remainingMembers.isEmpty()) {
+                        familyMemberRepository.delete(currentMember);
+                        familyRepository.delete(family);
+                    } else {
+                        if (family.getCreatedBy() != null && family.getCreatedBy().getId().equals(userId)) {
+                            User newOwner = remainingMembers.get(0).getUser();
+                            if (newOwner != null) {
+                                family.setCreatedBy(newOwner);
+                                familyRepository.save(family);
+                            }
+                        }
+                        familyMemberRepository.delete(currentMember);
+                    }
+                } else {
+                    familyMemberRepository.delete(currentMember);
+                }
+            } else {
+                familyMemberRepository.delete(currentMember);
+            }
+        }
+
+        // Also reassign or clean up any other families created by this user
+        List<Family> createdFamilies = familyRepository.findAll().stream()
+                .filter(f -> f.getCreatedBy() != null && f.getCreatedBy().getId().equals(userId))
+                .toList();
+        for (Family f : createdFamilies) {
+            List<FamilyMember> remaining = familyMemberRepository.findByFamilyId(f.getId()).stream()
+                    .filter(m -> !m.getUser().getId().equals(userId))
+                    .toList();
+            if (remaining.isEmpty()) {
+                familyRepository.delete(f);
+            } else {
+                User nextOwner = remaining.get(0).getUser();
+                if (nextOwner != null) {
+                    f.setCreatedBy(nextOwner);
+                    familyRepository.save(f);
+                }
+            }
+        }
+
+        // 3. Clean up user's enrolled devices and status (cascades telemetry and device status)
+        List<Device> userDevices = deviceRepository.findByUserId(userId);
+        if (!userDevices.isEmpty()) {
+            deviceRepository.deleteAll(userDevices);
+        }
+
+        // 4. Clean up user records in dependent tables to ensure referential integrity
+        disconnectCodeRepository.deleteAllByUserId(userId);
+        approvalCodeRepository.deleteAllByChildUserIdOrParentUserId(userId);
+        refreshTokenRepository.deleteAllByUserId(userId);
+        emailVerificationCodeRepository.deleteAllByUserIdOrEmail(userId, userEmail);
+        emailPreferenceRepository.deleteByUserId(userId);
+        deviceSessionRepository.deleteByUserId(userId);
+        pairingRequestRepository.deleteAllByUserId(userId);
+        consentRepository.deleteByUserId(userId);
+        convocationMessageRepository.deleteAllByUserId(userId);
+
+        // 5. Delete user account permanently
+        try {
+            userRepository.delete(targetUser);
+            userRepository.flush();
+        } catch (Exception e) {
+            log.error("CRITICAL: Failed to delete user {}: {} | root cause: {}", userId, e.getMessage(), e.getCause());
+            throw e;
+        }
+
+        auditService.logEvent(null, "ADMIN_ACCOUNT_DELETED",
+                "Admin " + currentAdmin.getEmail() + " permanently deleted account: " + userEmail + " (Role: " + role + ")", ipAddress);
+        log.info("Admin successfully deleted user ID: {}, email: {}", userId, userEmail);
+
+        // 6. Post-Commit Asynchronous Email Dispatch
+        Runnable emailDispatcher = () -> {
+            try {
+                if (role == RoleType.PARENT) {
+                    emailService.sendParentAccountDeletionConfirmationAsync(userEmail, userName);
+                } else if (role == RoleType.CHILD) {
+                    emailService.sendChildAccountDeletionConfirmationAsync(userEmail, userName);
+                }
+            } catch (Exception e) {
+                log.error("Non-blocking error dispatching post-deletion email notifications for {}: {}", userEmail, e.getMessage());
+            }
+        };
+
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            emailDispatcher.run();
+                        }
+                    }
+            );
+        } else {
+            emailDispatcher.run();
+        }
+    }
+
     private Optional<User> findConnectedParent(Long childUserId) {
         Optional<FamilyMember> childMemberOpt = familyMemberRepository.findByUserId(childUserId);
-        if (childMemberOpt.isEmpty()) {
+        if (childMemberOpt.isEmpty() || childMemberOpt.get().getFamily() == null) {
             return Optional.empty();
         }
 
@@ -499,8 +642,12 @@ public class AccountDeletionService {
         List<FamilyMember> members = familyMemberRepository.findByFamilyId(familyId);
 
         for (FamilyMember member : members) {
-            if (member.getMemberRole() == RoleType.PARENT && !member.getUser().getId().equals(childUserId)) {
-                return userRepository.findById(member.getUser().getId());
+            try {
+                if (member.getMemberRole() == RoleType.PARENT && member.getUser() != null && !member.getUser().getId().equals(childUserId)) {
+                    return userRepository.findById(member.getUser().getId());
+                }
+            } catch (Exception ignored) {
+                // Ignore missing or proxy entity resolution errors
             }
         }
         return Optional.empty();

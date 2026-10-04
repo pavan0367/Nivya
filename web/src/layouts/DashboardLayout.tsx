@@ -198,6 +198,17 @@ export const DashboardLayout: React.FC = () => {
                 ))}
               </select>
             </div>
+            {devices.length === 0 && (
+              <button
+                type="button"
+                id="btn-parent-pair"
+                onClick={() => navigate('/pairing')}
+                className="badge badge-warning"
+                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', border: 'none' }}
+              >
+                NOT PAIRED — Pair Child Device
+              </button>
+            )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>

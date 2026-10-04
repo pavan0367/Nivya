@@ -104,7 +104,7 @@ export const authService = {
     localStorage.removeItem('nivya_child_active_device_id');
     localStorage.removeItem('nivya_child_device');
     localStorage.removeItem('nivya_parent_active_device_id');
-    // Note: Do not remove nivya_is_paired on logout so relogin recognizes already paired device
+    localStorage.removeItem('nivya_is_paired');
     window.location.href = '/login';
   },
 

@@ -174,6 +174,39 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
     }
 
+    @ExceptionHandler(jakarta.persistence.EntityNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleEntityNotFound(jakarta.persistence.EntityNotFoundException ex, HttpServletRequest request) {
+        log.warn("Entity not found on {}: {}", request.getRequestURI(), ex.getMessage());
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(),
+                HttpStatus.NOT_FOUND.getReasonPhrase(),
+                ex.getMessage() != null && !ex.getMessage().isBlank() ? ex.getMessage() : "Requested entity not found",
+                request.getRequestURI()
+        );
+        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(org.springframework.transaction.TransactionException.class)
+    public ResponseEntity<ErrorResponse> handleTransactionException(org.springframework.transaction.TransactionException ex, HttpServletRequest request) {
+        Throwable rootCause = ex.getRootCause() != null ? ex.getRootCause() : ex;
+        log.warn("Transaction error on {}: {}", request.getRequestURI(), rootCause.getMessage());
+        String message = rootCause.getMessage() != null && !rootCause.getMessage().isBlank()
+                ? rootCause.getMessage() : "Transaction processing error";
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+        if (rootCause instanceof AccessDeniedException) {
+            status = HttpStatus.FORBIDDEN;
+        } else if (rootCause instanceof ResourceNotFoundException || rootCause instanceof jakarta.persistence.EntityNotFoundException) {
+            status = HttpStatus.NOT_FOUND;
+        }
+        ErrorResponse error = new ErrorResponse(
+                status.value(),
+                status.getReasonPhrase(),
+                message,
+                request.getRequestURI()
+        );
+        return new ResponseEntity<>(error, status);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, HttpServletRequest request) {
         log.error("Unhandled server error processing request URI: {}", request.getRequestURI(), ex);

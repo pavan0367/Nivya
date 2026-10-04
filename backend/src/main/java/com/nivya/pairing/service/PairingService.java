@@ -302,8 +302,16 @@ public class PairingService {
      */
     @Transactional(readOnly = true)
     public PairingStatusResponse getPairingStatus(UserPrincipal principal) {
+        if (principal == null || principal.getId() == null) {
+            throw new AccessDeniedException("User is not authenticated");
+        }
+
         User user = userRepository.findById(principal.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + principal.getId()));
+
+        if (user.getRole() == RoleType.ADMIN) {
+            return PairingStatusResponse.unpaired(user.getRole());
+        }
 
         Optional<FamilyMember> optMembership = familyMemberRepository.findByUserId(user.getId());
         if (optMembership.isEmpty()) {
@@ -311,6 +319,10 @@ public class PairingService {
         }
 
         Family family = optMembership.get().getFamily();
+        if (family == null) {
+            return PairingStatusResponse.unpaired(user.getRole());
+        }
+
         return buildStatusResponse(family, user.getRole());
     }
 
@@ -600,9 +612,24 @@ public class PairingService {
     private PairingStatusResponse buildStatusResponse(Family family, RoleType userRole) {
         List<FamilyMember> members = familyMemberRepository.findByFamilyId(family.getId());
         List<LinkedMemberDto> memberDtos = new ArrayList<>();
+        boolean hasParent = false;
+        boolean hasChild = false;
+
         for (FamilyMember m : members) {
-            User u = m.getUser();
-            memberDtos.add(new LinkedMemberDto(u.getId(), u.getName(), u.getEmail(), m.getMemberRole(), m.getJoinedAt()));
+            try {
+                User u = m.getUser();
+                if (u != null && u.getId() != null) {
+                    memberDtos.add(new LinkedMemberDto(u.getId(), u.getName(), u.getEmail(), m.getMemberRole(), m.getJoinedAt()));
+                    if (m.getMemberRole() == RoleType.PARENT || u.getRole() == RoleType.PARENT) {
+                        hasParent = true;
+                    }
+                    if (m.getMemberRole() == RoleType.CHILD || u.getRole() == RoleType.CHILD) {
+                        hasChild = true;
+                    }
+                }
+            } catch (Exception ignored) {
+                // Ignore unresolvable or deleted member user proxy
+            }
         }
 
         List<Device> devices = deviceRepository.findByFamilyId(family.getId());
@@ -610,56 +637,64 @@ public class PairingService {
         Instant twoMinutesAgo = Instant.now().minusSeconds(120);
 
         for (Device d : devices) {
-            Optional<DeviceStatus> optStatus = deviceStatusRepository.findByDeviceId(d.getId());
-            boolean isOnline = optStatus.map(DeviceStatus::isOnline).orElse(false);
-            Integer battery = optStatus.map(DeviceStatus::getBatteryPct).orElse(null);
-            String netType = optStatus.map(DeviceStatus::getNetworkType).orElse("UNKNOWN");
-            String netQuality = optStatus.map(DeviceStatus::getNetworkQuality).orElse("UNKNOWN");
-            Instant lastSync = optStatus.map(DeviceStatus::getLastSyncAt).orElse(d.getLastSeenAt());
-            Instant lastSeen = d.getLastSeenAt() != null ? d.getLastSeenAt() : lastSync;
-            if (lastSync != null && (lastSeen == null || lastSync.isAfter(lastSeen))) {
-                lastSeen = lastSync;
-            }
-
-            // Authoritative stale and online status evaluation
-            boolean isReported = (lastSeen != null);
-            boolean isStale = isReported && lastSeen.isBefore(twoMinutesAgo);
-            if (!isReported) {
-                isOnline = false;
-                isStale = false;
-            } else if (isStale) {
-                isOnline = false;
-            }
-
-            DeviceStatusDto dto = new DeviceStatusDto(
-                    d.getId(),
-                    d.getDeviceUuid(),
-                    d.getDeviceName(),
-                    d.getPlatform(),
-                    isOnline,
-                    battery,
-                    netType,
-                    netQuality,
-                    lastSync,
-                    lastSeen,
-                    isStale
-            );
-            dto.setId(d.getId());
-            if (d.getUser() != null) {
-                dto.setUserId(d.getUser().getId());
-                if (d.getUser().getRole() != null) {
-                    dto.setUserRole(d.getUser().getRole().name());
-                    dto.setIsChildDevice(d.getUser().getRole() == RoleType.CHILD);
+            try {
+                Optional<DeviceStatus> optStatus = deviceStatusRepository.findByDeviceId(d.getId());
+                boolean isOnline = optStatus.map(DeviceStatus::isOnline).orElse(false);
+                Integer battery = optStatus.map(DeviceStatus::getBatteryPct).orElse(null);
+                String netType = optStatus.map(DeviceStatus::getNetworkType).orElse("UNKNOWN");
+                String netQuality = optStatus.map(DeviceStatus::getNetworkQuality).orElse("UNKNOWN");
+                Instant lastSync = optStatus.map(DeviceStatus::getLastSyncAt).orElse(d.getLastSeenAt());
+                Instant lastSeen = d.getLastSeenAt() != null ? d.getLastSeenAt() : lastSync;
+                if (lastSync != null && (lastSeen == null || lastSync.isAfter(lastSeen))) {
+                    lastSeen = lastSync;
                 }
+
+                // Authoritative stale and online status evaluation
+                boolean isReported = (lastSeen != null);
+                boolean isStale = isReported && lastSeen.isBefore(twoMinutesAgo);
+                if (!isReported) {
+                    isOnline = false;
+                    isStale = false;
+                } else if (isStale) {
+                    isOnline = false;
+                }
+
+                DeviceStatusDto dto = new DeviceStatusDto(
+                        d.getId(),
+                        d.getDeviceUuid(),
+                        d.getDeviceName(),
+                        d.getPlatform(),
+                        isOnline,
+                        battery,
+                        netType,
+                        netQuality,
+                        lastSync,
+                        lastSeen,
+                        isStale
+                );
+                dto.setId(d.getId());
+                if (d.getUser() != null) {
+                    try {
+                        dto.setUserId(d.getUser().getId());
+                        if (d.getUser().getRole() != null) {
+                            dto.setUserRole(d.getUser().getRole().name());
+                            dto.setIsChildDevice(d.getUser().getRole() == RoleType.CHILD);
+                        }
+                    } catch (Exception ignored) {}
+                }
+                deviceDtos.add(dto);
+            } catch (Exception ignored) {
+                // Ignore unresolvable device proxy
             }
-            deviceDtos.add(dto);
         }
 
+        boolean isPaired = hasParent && hasChild;
+
         return new PairingStatusResponse(
-                true,
-                family.getId(),
-                family.getFamilyCode(),
-                family.getName(),
+                isPaired,
+                isPaired ? family.getId() : null,
+                isPaired ? family.getFamilyCode() : null,
+                isPaired ? family.getName() : null,
                 userRole,
                 memberDtos,
                 deviceDtos

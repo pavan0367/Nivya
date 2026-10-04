@@ -53,22 +53,15 @@ export const LoginPage: React.FC = () => {
       }
 
       if (userRole === 'CHILD') {
-        // Authoritative Child role: active connection -> /child, no active connection -> /pairing
-        const target = authService.getPostAuthDestination('CHILD', isPaired);
-        navigate(target, { replace: true });
+        // Child enters role-specific app (/child) even when not yet paired
+        navigate('/child', { replace: true });
         return;
       }
 
-      // PARENT LOGIN: Check pairing state to differentiate already-paired vs setup-incomplete
-      if (isPaired) {
-        // ALREADY PAIRED PARENT: Direct to parent dashboard
-        const origin = (location.state as any)?.from?.pathname;
-        const target = (origin && origin !== '/access-denied' && !origin.startsWith('/child')) ? origin : '/dashboard';
-        navigate(target, { replace: true });
-      } else {
-        // UNPAIRED PARENT: Route to pairing
-        navigate('/pairing', { replace: true });
-      }
+      // PARENT LOGIN: Enter role-specific dashboard (/dashboard) even when not yet paired
+      const origin = (location.state as any)?.from?.pathname;
+      const target = (origin && origin !== '/access-denied' && !origin.startsWith('/child') && origin !== '/pairing') ? origin : '/dashboard';
+      navigate(target, { replace: true });
     } catch (err: any) {
       console.error('Login failed:', err);
       const serverMsg = err.response?.data?.message ||

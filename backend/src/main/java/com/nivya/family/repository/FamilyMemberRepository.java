@@ -12,7 +12,13 @@ public interface FamilyMemberRepository extends JpaRepository<FamilyMember, Long
 
     Optional<FamilyMember> findByFamilyIdAndUserId(Long familyId, Long userId);
 
-    Optional<FamilyMember> findByUserId(Long userId);
+    List<FamilyMember> findAllByUserId(Long userId);
+
+    Optional<FamilyMember> findFirstByUserIdOrderByIdDesc(Long userId);
+
+    default Optional<FamilyMember> findByUserId(Long userId) {
+        return findFirstByUserIdOrderByIdDesc(userId);
+    }
 
     List<FamilyMember> findByFamilyId(Long familyId);
 
