@@ -35,10 +35,15 @@ import { ChildDeviceHealthPage } from '../pages/ChildDashboard/ChildDeviceHealth
 import { ChildAlertsPage } from '../pages/ChildDashboard/ChildAlertsPage';
 import { ChildConvocationPage } from '../pages/ChildDashboard/ChildConvocationPage';
 
+// Admin Pages & Layout
+import { AdminLayout } from '../layouts/AdminLayout';
+import { AdminDashboardPage } from '../pages/Admin/AdminDashboardPage';
+
 /**
  * Role-aware landing selector.
  * Guarantees Child accounts land directly on /child,
  * Parent accounts land directly on /dashboard,
+ * Admin accounts land directly on /admin,
  * and unauthenticated sessions land on /login.
  */
 export const RoleAwareLanding: React.FC = () => {
@@ -46,6 +51,9 @@ export const RoleAwareLanding: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
   const role = authService.getUserRole();
+  if (role === 'ADMIN') {
+    return <Navigate to="/admin" replace />;
+  }
   if (role === 'CHILD') {
     return <Navigate to={authService.getPostAuthDestination('CHILD', authService.isPaired())} replace />;
   }
@@ -99,6 +107,13 @@ export const AppRoutes: React.FC = () => {
             <Route path="/alerts" element={<AlertsPage />} />
             <Route path="/convocation" element={<ConvocationPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+          </Route>
+        </Route>
+
+        {/* Admin-Only Routes */}
+        <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
+          <Route element={<AdminLayout />}>
+            <Route path="/admin" element={<AdminDashboardPage />} />
           </Route>
         </Route>
       </Route>

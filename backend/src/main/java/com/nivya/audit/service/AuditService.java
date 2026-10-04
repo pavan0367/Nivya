@@ -30,10 +30,18 @@ public class AuditService {
      */
     @Transactional
     public AuditLog logEvent(Long userId, String action, String details, String ipAddress) {
+        return logAdminEvent(userId, null, action, details, ipAddress);
+    }
+
+    /**
+     * Persists an administrative audit log entry tracking administrative actor and target user.
+     */
+    @Transactional
+    public AuditLog logAdminEvent(Long adminUserId, Long targetUserId, String action, String details, String ipAddress) {
         try {
-            AuditLog entry = new AuditLog(userId, action, details, ipAddress);
+            AuditLog entry = new AuditLog(adminUserId, targetUserId, action, details, ipAddress);
             entry = auditLogRepository.save(entry);
-            log.info("AUDIT [{}]: user={} ip={} details={}", action, userId, ipAddress, details);
+            log.info("AUDIT [{}]: admin={} targetUser={} ip={} details={}", action, adminUserId, targetUserId, ipAddress, details);
             return entry;
         } catch (Exception e) {
             log.error("Failed to persist audit log for action {}: {}", action, e.getMessage());

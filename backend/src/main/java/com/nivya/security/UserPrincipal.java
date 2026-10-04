@@ -102,7 +102,7 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return status != UserStatus.SUSPENDED;
+        return status != UserStatus.SUSPENDED && status != UserStatus.DISABLED;
     }
 
     @Override

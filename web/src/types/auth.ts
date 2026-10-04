@@ -1,4 +1,4 @@
-export type RoleType = 'PARENT' | 'CHILD';
+export type RoleType = 'PARENT' | 'CHILD' | 'ADMIN';
 
 export interface User {
   id: number;

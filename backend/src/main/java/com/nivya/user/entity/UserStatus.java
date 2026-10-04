@@ -5,6 +5,7 @@ package com.nivya.user.entity;
  */
 public enum UserStatus {
     ACTIVE,
+    DISABLED,
     SUSPENDED,
     PENDING
 }

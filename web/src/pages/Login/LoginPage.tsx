@@ -37,6 +37,11 @@ export const LoginPage: React.FC = () => {
       const data = await authService.login(email, password);
       const userRole = data.user.role;
 
+      if (userRole === 'ADMIN') {
+        navigate('/admin', { replace: true });
+        return;
+      }
+
       // Check server-authoritative pairing status to differentiate paired vs setup-incomplete
       let isPaired = false;
       try {

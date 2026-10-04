@@ -10,6 +10,7 @@ import com.nivya.email.service.EmailService;
 import com.nivya.security.UserPrincipal;
 import com.nivya.security.jwt.JwtTokenProvider;
 import com.nivya.session.service.DeviceSessionService;
+import com.nivya.role.RoleType;
 import com.nivya.user.entity.User;
 import com.nivya.user.entity.UserStatus;
 import com.nivya.user.repository.UserRepository;
@@ -75,6 +76,11 @@ public class AuthService {
     @Transactional
     public AuthResponse register(RegisterRequest request, String ipAddress) {
         String normalizedEmail = request.getEmail().toLowerCase().trim();
+
+        if (request.getRole() == RoleType.ADMIN || (request.getRole() != RoleType.PARENT && request.getRole() != RoleType.CHILD)) {
+            auditService.logEvent(null, "AUTH_REGISTER_BLOCKED", "Public registration attempted to create unauthorized role: " + request.getRole(), ipAddress);
+            throw new IllegalArgumentException("Public registration cannot create ADMIN accounts");
+        }
 
         if (userRepository.existsByEmail(normalizedEmail)) {
             auditService.logEvent(null, "AUTH_REGISTER_FAILED", "Duplicate email attempt: " + normalizedEmail, ipAddress);
@@ -214,6 +220,10 @@ public class AuthService {
         refreshTokenRepository.save(token);
 
         User user = token.getUser();
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            auditService.logEvent(user.getId(), "TOKEN_REFRESH_BLOCKED", "Inactive account attempted token refresh (status: " + user.getStatus() + ")", ipAddress);
+            throw new InvalidTokenException("Account is not active (status: " + user.getStatus() + ")");
+        }
         String newRefreshTokenString = createRefreshToken(user, token.getDeviceFingerprint());
         UserPrincipal principal = UserPrincipal.create(user);
         String newAccessToken = tokenProvider.generateAccessToken(principal);

@@ -129,6 +129,10 @@ export const authService = {
     return this.getUserRole() === 'CHILD';
   },
 
+  isAdmin(): boolean {
+    return this.getUserRole() === 'ADMIN';
+  },
+
   isPaired(): boolean {
     return localStorage.getItem('nivya_is_paired') === 'true';
   },
@@ -138,6 +142,9 @@ export const authService = {
   },
 
   getPostAuthDestination(role: RoleType, paired: boolean): string {
+    if (role === 'ADMIN') {
+      return '/admin';
+    }
     if (role === 'CHILD') {
       return paired ? '/child' : '/pairing';
     }

@@ -6,7 +6,8 @@ package com.nivya.role;
  */
 public enum RoleType {
     PARENT,
-    CHILD;
+    CHILD,
+    ADMIN;
 
     public String getAuthority() {
         return "ROLE_" + this.name();

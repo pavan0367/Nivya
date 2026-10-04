@@ -1,58 +1,46 @@
-package com.nivya.audit.entity;
+package com.nivya.admin.dto;
 
-import jakarta.persistence.*;
+import com.nivya.audit.entity.AuditLog;
 
 import java.time.Instant;
 
 /**
- * Immutable security and audit logging entity.
+ * Administrative projection of an audit log entry.
  */
-@Entity
-@Table(name = "audit_logs")
-public class AuditLog {
+public class AdminAuditLogDto {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(name = "user_id")
     private Long userId;
-
-    @Column(name = "target_user_id")
     private Long targetUserId;
-
-    @Column(nullable = false, length = 100)
     private String action;
-
-    @Column(columnDefinition = "TEXT")
     private String details;
-
-    @Column(name = "ip_address", length = 45)
     private String ipAddress;
-
-    @Column(nullable = false, updatable = false)
     private Instant timestamp;
 
-    public AuditLog() {
+    public AdminAuditLogDto() {
     }
 
-    public AuditLog(Long userId, String action, String details, String ipAddress) {
-        this(userId, null, action, details, ipAddress);
-    }
-
-    public AuditLog(Long userId, Long targetUserId, String action, String details, String ipAddress) {
+    public AdminAuditLogDto(Long id, Long userId, Long targetUserId, String action,
+                            String details, String ipAddress, Instant timestamp) {
+        this.id = id;
         this.userId = userId;
         this.targetUserId = targetUserId;
         this.action = action;
         this.details = details;
         this.ipAddress = ipAddress;
+        this.timestamp = timestamp;
     }
 
-    @PrePersist
-    protected void onCreate() {
-        if (this.timestamp == null) {
-            this.timestamp = Instant.now();
-        }
+    public static AdminAuditLogDto fromEntity(AuditLog log) {
+        return new AdminAuditLogDto(
+                log.getId(),
+                log.getUserId(),
+                log.getTargetUserId(),
+                log.getAction(),
+                log.getDetails(),
+                log.getIpAddress(),
+                log.getTimestamp()
+        );
     }
 
     public Long getId() {

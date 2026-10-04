@@ -106,6 +106,7 @@ public class SecurityConfig {
                         // Role-specific protected endpoints
                         .requestMatchers("/api/v1/parent/**").hasRole("PARENT")
                         .requestMatchers("/api/v1/child/**").hasRole("CHILD")
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         // All other APIs require authentication
                         .anyRequest().authenticated()
                 );

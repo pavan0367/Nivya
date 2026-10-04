@@ -25,4 +25,10 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
     Optional<Device> findByPushToken(String pushToken);
 
     List<Device> findAllByPushToken(String pushToken);
+
+    long countByStatus(String status);
+
+    long countByLastSeenAtAfter(java.time.Instant cutoff);
+
+    long countByUserId(Long userId);
 }
